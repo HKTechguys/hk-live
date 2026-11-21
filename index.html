@@ -28,6 +28,11 @@
     color:var(--dim); text-transform:uppercase}
   .brand b{color:var(--teal); font-weight:600; letter-spacing:.24em}
   .hist{font-size:11px; color:var(--dim); margin-top:7px; letter-spacing:.03em}
+  .geo{margin-top:11px; font-size:13px; color:#cfdcdd}
+  .geo .near{display:block}
+  .geo .also{display:block; font-size:12px; color:var(--dim); margin-top:5px}
+  .gbtn{font:inherit; font-size:12px; color:var(--teal); background:rgba(84,216,196,.08);
+    border:1px solid rgba(84,216,196,.4); border-radius:999px; padding:7px 13px; cursor:pointer}
   .hero{margin:16px 0 0}
   .now{font-size:13px; color:var(--dim)}
   .temp{display:flex; align-items:baseline; gap:6px; margin:6px 0 2px}
@@ -92,6 +97,7 @@
     <div class="temp"><span class="n" id="temp">--</span><span class="u">°C</span></div>
     <div class="sub" id="sub">濕度 -- · 更新 --</div>
     <div class="desc" id="desc"></div>
+    <div class="geo" id="geo"></div>
   </div>
 
   <div class="card holiday">
@@ -179,6 +185,65 @@ function updateTitle(){
   if(t && t !== "--") document.title = t+"°C · "+(h ? h.n+" 仲有 "+h.days+" 日" : "香港即時");
 }
 
+// ---- 位置感知:搵最近嘅氣溫站 ----
+const STA = [
+  {n:"京士柏",la:22.312,lo:114.173},{n:"香港天文台",la:22.302,lo:114.174},
+  {n:"黃竹坑",la:22.248,lo:114.170},{n:"打鼓嶺",la:22.545,lo:114.152},
+  {n:"流浮山",la:22.469,lo:113.984},{n:"大埔",la:22.448,lo:114.170},
+  {n:"沙田",la:22.387,lo:114.188},{n:"屯門",la:22.390,lo:113.972},
+  {n:"將軍澳",la:22.318,lo:114.270},{n:"西貢",la:22.383,lo:114.275},
+  {n:"長洲",la:22.201,lo:114.027},{n:"赤鱲角",la:22.309,lo:113.914},
+  {n:"青衣",la:22.348,lo:114.100},{n:"石崗",la:22.436,lo:114.083},
+  {n:"荃灣可觀",la:22.375,lo:114.113},{n:"荃灣城門谷",la:22.383,lo:114.130},
+  {n:"香港公園",la:22.278,lo:114.160},{n:"筲箕灣",la:22.282,lo:114.230},
+  {n:"九龍城",la:22.328,lo:114.187},{n:"跑馬地",la:22.270,lo:114.180},
+  {n:"黃大仙",la:22.340,lo:114.196},{n:"赤柱",la:22.216,lo:114.219},
+  {n:"觀塘",la:22.318,lo:114.222},{n:"深水埗",la:22.333,lo:114.160},
+  {n:"啟德跑道公園",la:22.305,lo:114.212},{n:"元朗公園",la:22.440,lo:114.030},
+  {n:"大美督",la:22.466,lo:114.240}
+];
+let geoPos = null;
+function haversine(la1,lo1,la2,lo2){
+  const R = 6371, r = Math.PI/180;
+  const dLa = (la2-la1)*r, dLo = (lo2-lo1)*r;
+  const a = Math.sin(dLa/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function renderGeo(){
+  const el = document.getElementById("geo");
+  if(!geoPos){
+    el.innerHTML = '<button class="gbtn" id="geobtn">用我位置睇附近氣溫</button>';
+    document.getElementById("geobtn").addEventListener("click", askGeo);
+    return;
+  }
+  const rows = (window.__temps||[]).map(t=>{
+    const s = STA.find(x=>x.n===t.place);
+    return s ? {p:t.place, v:t.value, d:haversine(geoPos.lat, geoPos.lon, s.la, s.lo)} : null;
+  }).filter(Boolean).sort((a,b)=>a.d-b.d);
+  if(!rows.length){ el.innerHTML = '<span class="also">附近氣溫暫時讀唔到，等一陣再掃</span>'; return; }
+  const main = rows[0], rest = rows.slice(1,3);
+  el.innerHTML = '<span class="near">你附近 <b>'+main.p+' '+main.v+'°C</b> · '+
+    main.d.toFixed(1)+' km</span><span class="also">亦近：'+
+    rest.map(r=>r.p+' '+r.v+'°').join(' · ')+'</span>';
+}
+function askGeo(){
+  const el = document.getElementById("geo");
+  if(!navigator.geolocation){ el.innerHTML = '<span class="also">部機唔支援定位</span>'; return; }
+  el.innerHTML = '<span class="also">定位中…</span>';
+  navigator.geolocation.getCurrentPosition(
+    p=>{ geoPos = {lat:p.coords.latitude, lon:p.coords.longitude}; renderGeo(); },
+    ()=>{ el.innerHTML = '<span class="also">唔開得定位 — 照睇天文台總部嘅數</span>'
+      + '<br><button class="gbtn" id="geobtn">再試一次</button>';
+      document.getElementById("geobtn").addEventListener("click", askGeo); },
+    {timeout:8000, maximumAge:600000}
+  );
+}
+renderGeo();
+if(navigator.permissions && navigator.permissions.query){
+  navigator.permissions.query({name:"geolocation"})
+    .then(s=>{ if(s.state==="granted") askGeo(); }).catch(()=>{});
+}
+
 const URL_NOW = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc";
 const FND = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc";
 
@@ -188,6 +253,8 @@ function renderNow(j){
   const temps = (j.temperature && j.temperature.data) || [];
   const pick = temps.find(x => x.place === "香港天文台") || temps[0];
   if(pick) setText("temp", pick.value);
+  window.__temps = temps;
+  if(geoPos) renderGeo();
   updateTitle();
   if(!window.__buzzed && navigator.vibrate){
     window.__buzzed = true;
