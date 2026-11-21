@@ -17,6 +17,7 @@
     -webkit-font-smoothing:antialiased;
     min-height:100vh; position:relative; overflow-x:hidden;
   }
+  /* 淡淡風線背景,同部機雨區頁一個調 */
   .wind{position:fixed; inset:-20% -50%; pointer-events:none; opacity:.22; z-index:0;
     background:repeating-linear-gradient(115deg,
       rgba(84,216,196,.0) 0 26px, rgba(84,216,196,.55) 26px 27px, rgba(84,216,196,0) 27px 96px);
@@ -40,6 +41,8 @@
   .temp .u{font-size:15px; color:var(--dim)}
   .sub{font-size:13px; color:var(--dim)}
   .desc{font-size:14px; line-height:1.55; margin-top:10px; color:#cfdcdd}
+  .warn{display:inline-block; margin-top:10px; padding:7px 12px; border-radius:10px;
+    background:rgba(240,180,90,.12); border:1px solid rgba(240,180,90,.35); color:#ffd7a1; font-size:13px}
   .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:14px}
   .k{font-size:11px; color:var(--dim); letter-spacing:.12em}
   .holiday .days{display:flex; align-items:baseline; gap:6px; margin-top:8px}
@@ -62,6 +65,7 @@
   .d .p{font-size:11px; color:var(--dim); margin-top:4px}
   .foot{margin-top:22px; font-size:11px; color:var(--dim); line-height:1.7}
   .foot a{color:var(--dim)}
+  .err{color:#ffb3b3}
   .banner{display:none; margin:0 0 14px; padding:13px 14px; border-radius:14px;
     font-size:14px; line-height:1.5; font-weight:600; letter-spacing:.02em;
     background:rgba(240,180,90,.14); border:1px solid rgba(240,180,90,.45); color:#ffdda8}
@@ -78,6 +82,11 @@
   .rsw button{font:inherit; font-size:11px; color:var(--dim); background:rgba(255,255,255,.05);
     border:1px solid var(--line); border-radius:8px; padding:4px 9px; cursor:pointer}
   .rsw button[aria-pressed="true"]{color:var(--teal); border-color:var(--teal)}
+  .rfoot{display:flex; align-items:center; gap:8px; margin-top:9px}
+  .rfoot .ok{flex:1; line-height:1.5}
+  .pbtn{font:inherit; font-size:11px; color:var(--teal); background:rgba(84,216,196,.08);
+    border:1px solid rgba(84,216,196,.4); border-radius:8px; padding:4px 10px; cursor:pointer}
+  .pbtn[aria-pressed="false"]{color:var(--dim); border-color:var(--line)}
   .shot{position:relative; margin-top:10px; padding-top:100%;
     overflow:hidden; border-radius:12px; background:#04121a}
   .shot img{position:absolute; inset:0; width:100%; height:100%;
@@ -116,12 +125,16 @@
     <div class="krow">
       <div class="k">雷達雨區</div>
       <div class="rsw">
-        <button id="r128" aria-pressed="true">128km</button>
+        <button id="r64" aria-pressed="true">64km</button>
+        <button id="r128" aria-pressed="false">128km</button>
         <button id="r256" aria-pressed="false">256km</button>
       </div>
     </div>
     <div class="shot"><img id="radarimg" alt="香港天文台雷達雨區圖" referrerpolicy="no-referrer"></div>
-    <div class="ok" id="radartime" style="margin-top:9px">讀取中…</div>
+    <div class="rfoot">
+      <div class="ok" id="radartime">讀取中…</div>
+      <button class="pbtn" id="radarplay" aria-pressed="true">暫停</button>
+    </div>
   </div>
 
   <div class="card">
@@ -142,6 +155,7 @@ function pad(n){return String(n).padStart(2,"0")}
 function ymd(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 const WD = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
 
+// ---- 假期倒數(唔需要上網,已經烘入) ----
 (function(){
   const t = new Date(); t.setHours(0,0,0,0);
   const next = HOL.find(h => new Date(h.d+"T00:00:00") >= t);
@@ -157,6 +171,7 @@ const WD = ["星期日","星期一","星期二","星期三","星期四","星期�
   if(days===0) document.getElementById("hd").textContent = "今";
 })();
 
+// ---- 掃描史(存在手機本地,唔上傳) ----
 let scan = {count:0, day:"", dayCount:0, last:0};
 try{ const raw = localStorage.getItem("hk_scan"); if(raw) scan = JSON.parse(raw) || scan; }catch(e){}
 (function(){
@@ -244,7 +259,9 @@ if(navigator.permissions && navigator.permissions.query){
     .then(s=>{ if(s.state==="granted") askGeo(); }).catch(()=>{});
 }
 
+// ---- 天氣:天文台公開資料(CORS 開放) ----
 const URL_NOW = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc";
+const URL_FND = "https://data.weather.gov.hk/opendata/weather.php?dataType=fnd&lang=tc";
 const FND = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc";
 
 function setText(id, s){ document.getElementById(id).textContent = s }
@@ -267,8 +284,10 @@ function renderNow(j){
   if(up) s += " · 更新 " + up;
   setText("sub", s);
   updateFoot();
-  applyWarn((j.warningMessage||"").trim());
+  const w = (j.warningMessage||"").trim();
+  applyWarn(w);
 
+  // 雨量:只列有數值嘅地區
   const rf = (j.rainfall && j.rainfall.data) || [];
   const hit = rf.filter(x => typeof x.max === "number" && x.max > 0)
                 .sort((a,b)=>b.max-a.max).slice(0,6);
@@ -295,7 +314,7 @@ function renderFnd(j){
   updateFoot();
   const wrap = document.getElementById("fnd");
   wrap.innerHTML = list.map(f=>{
-    const ds = f.forecastDate;
+    const ds = f.forecastDate;               // yyyymmdd
     const d = new Date(ds.slice(0,4)+"-"+ds.slice(4,6)+"-"+ds.slice(6,8)+"T00:00:00");
     const t = (f.forecastMintemp?f.forecastMintemp.value:"?")+"–"+(f.forecastMaxtemp?f.forecastMaxtemp.value:"?")+"°";
     return '<div class="d"><div class="w">'+WD[d.getDay()]+'</div><div class="dd">'
@@ -310,6 +329,7 @@ function updateFoot(){
     "資料來源：香港天文台（"+(up?"更新 "+up+"，":"")+"每 5 分鐘自動重讀）· 假期：1823<br>離線時顯示上一次讀到嘅數值。";
 }
 
+// ---- 警告分類:1 提示 / 2 戒備 / 3 嚴重 ----
 const WLV = [
   {lv:3, re:/(十號|九號|八號|黑色暴雨)/},
   {lv:2, re:/(三號|紅色暴雨|海嘯)/},
@@ -320,46 +340,129 @@ function applyWarn(msg){
   if(!msg){ box.style.display="none"; document.body.removeAttribute("data-lv"); return; }
   const hit = WLV.find(w => w.re.test(msg));
   document.body.dataset.lv = hit ? hit.lv : 1;
-  box.textContent = msg.replace(/。$/,"");
+  box.textContent = msg.replace(/。/,"");
   box.style.display = "block";
 }
 
+// ---- 雷達雨區(天文台圖檔,每 6 分鐘一張,逐格播放) ----
 const RAD = {
+  "64":  {dir:"rad_064_png", pre:"2d064nradar_"},
   "128": {dir:"rad_128_png", pre:"2d128nradar_"},
   "256": {dir:"rad_256_png", pre:"2d256nradar_"}
 };
-let radRange = "128";
-document.getElementById("r128").addEventListener("click", () => setRange("128"));
-document.getElementById("r256").addEventListener("click", () => setRange("256"));
+const RADS = ["64","128","256"];
+const RAD_N = 6;              // 動畫格數(6 格 = 近 30 分鐘)
+let radRange = "64", radFrames = [], radIdx = 0, radTimer = null, radPlay = true, radStarted = false, radLoops = 2;
+RADS.forEach(r => {
+  const b = document.getElementById("r"+r);
+  if(b) b.addEventListener("click", () => setRange(r));
+});
+document.getElementById("radarplay").addEventListener("click", togglePlay);
+
+function radUrl(t){
+  const c = RAD[radRange];
+  return "https://www.hko.gov.hk/wxinfo/radars/"+c.dir+"/"+c.pre+stamp(t)+".jpg";
+}
+function radLabel(t){ return radRange+"km · "+pad(t.getHours())+":"+pad(t.getMinutes())+" HKT"; }
 function setRange(r){
   radRange = r;
-  document.getElementById("r128").setAttribute("aria-pressed", r==="128");
-  document.getElementById("r256").setAttribute("aria-pressed", r==="256");
+  RADS.forEach(x => document.getElementById("r"+x).setAttribute("aria-pressed", x===r));
   loadRadar();
 }
-function stamp(d){
-  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+pad(d.getHours())+pad(d.getMinutes());
+function stopAnim(){ if(radTimer){ clearInterval(radTimer); radTimer = null; } }
+function togglePlay(){
+  radPlay = !radPlay;
+  const b = document.getElementById("radarplay");
+  b.setAttribute("aria-pressed", radPlay);
+  b.textContent = radPlay ? "暫停" : "播放";
+  if(radPlay){ radStarted = false; startAnim(radFrames); }
+  else {
+    stopAnim();
+    const f = radFrames[radIdx];
+    if(f) document.getElementById("radartime").textContent = radLabel(f.t) + " · 已暫停";
+  }
 }
 function loadRadar(){
-  const cfg = RAD[radRange];
-  const img = document.getElementById("radarimg");
-  const lab = document.getElementById("radartime");
+  stopAnim(); radFrames = []; radIdx = 0; radStarted = false;
   const base = new Date();
   base.setMinutes(base.getMinutes() - base.getMinutes()%6);
   base.setSeconds(0,0);
-  let i = 0;
-  lab.textContent = "讀取中…";
-  function tick(){
-    if(i > 9){ lab.textContent = "雷達圖暫時讀唔到，第 6 分鐘再試"; return; }
+  document.getElementById("radartime").textContent = "讀取中…";
+  probe(0);
+  function probe(i){
+    if(i > 9){ document.getElementById("radartime").textContent = "雷達圖暫時讀唔到，第 6 分鐘再試"; return; }
     const t = new Date(base.getTime() - i*6*60000);
-    i++;
-    img.onerror = tick;
-    img.onload = () => {
-      lab.textContent = radRange+" 公里範圍 · 圖像 "+pad(t.getHours())+":"+pad(t.getMinutes())+" HKT · 每 6 分鐘更新";
+    const im = new Image();
+    im.onload = () => {
+      document.getElementById("radarimg").src = im.src;
+      document.getElementById("radartime").textContent = radLabel(t) + " · 載入動畫…";
+      prefetch(t);
     };
-    img.src = "https://www.hko.gov.hk/wxinfo/radars/"+cfg.dir+"/"+cfg.pre+stamp(t)+".jpg";
+    im.onerror = () => probe(i+1);
+    im.src = radUrl(t);
   }
-  tick();
+}
+function prefetch(tNew){
+  const items = [];
+  let done = 0;
+  const fin = () => { done++; if(done === RAD_N) startAnim(items); };
+  for(let k = RAD_N-1; k >= 0; k--){
+    const t = new Date(tNew.getTime() - k*6*60000);
+    const im = new Image();
+    im.onload = () => { items.push({t:t, src:im.src}); fin(); };
+    im.onerror = fin;
+    im.src = radUrl(t);
+  }
+}
+function startAnim(items){
+  if(radStarted) return;
+  radFrames = (items || []).slice().sort((a,b) => a.t - b.t);
+  if(!radFrames.length) return;
+  if(!radPlay || radFrames.length < 2){
+    document.getElementById("radarimg").src = radFrames[radFrames.length-1].src;
+    document.getElementById("radartime").textContent = radLabel(radFrames[radFrames.length-1].t) + " · 按「播放」睇動畫";
+    return;
+  }
+  radStarted = true;
+  stopAnim();
+  radIdx = 0; radLoops = 2;
+  showFrame();
+  radTimer = setInterval(() => {
+    radIdx++;
+    if(radIdx >= radFrames.length){
+      radIdx = 0;
+      radLoops--;
+      if(radLoops <= 0){
+        // 播完兩輪就停在最新一格,慳電慳數據
+        stopAnim();
+        radPlay = false;
+        radIdx = radFrames.length - 1;
+        const b = document.getElementById("radarplay");
+        b.setAttribute("aria-pressed", false);
+        b.textContent = "播放";
+        const f = radFrames[radIdx];
+        document.getElementById("radarimg").src = f.src;
+        document.getElementById("radartime").textContent =
+          radLabel(f.t) + " · 按「播放」再播";
+        return;
+      }
+    }
+    showFrame();
+  }, 650);
+}
+function showFrame(){
+  const f = radFrames[radIdx];
+  if(!f) return;
+  document.getElementById("radarimg").src = f.src;
+  document.getElementById("radartime").textContent =
+    radLabel(f.t) + " · 近 " + (radFrames.length*6) + " 分鐘逐格播";
+}
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden) stopAnim();
+  else if(radPlay && radFrames.length > 1 && !radTimer){ radStarted = false; startAnim(radFrames); }
+});
+function stamp(d){
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+pad(d.getHours())+pad(d.getMinutes());
 }
 
 function load(url, fn, tag){
@@ -374,7 +477,7 @@ load(URL_NOW, renderNow, "now");
 load(FND, renderFnd, "fnd");
 loadRadar();
 setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
-setInterval(loadRadar, 360000);
+setInterval(loadRadar, 720000);
 </script>
 </body>
 </html>
