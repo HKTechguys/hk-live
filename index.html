@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1016">
+<title>香港即時 · 掃一下</title>
+<style>
+  :root{
+    --ink:#eaf6f5; --dim:#8fa3ad; --line:rgba(120,200,190,.18);
+    --bg:#0b1016; --card:#111a22; --teal:#54d8c4; --amber:#f0b45a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"PingFang HK","PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh; position:relative; overflow-x:hidden;
+  }
+  .wind{position:fixed; inset:-20% -50%; pointer-events:none; opacity:.22; z-index:0;
+    background:repeating-linear-gradient(115deg,
+      rgba(84,216,196,.0) 0 26px, rgba(84,216,196,.55) 26px 27px, rgba(84,216,196,0) 27px 96px);
+    animation:blow 9s linear infinite;}
+  @keyframes blow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-96px,40px,0)}}
+  @media (prefers-reduced-motion:reduce){.wind{animation:none}}
+  .wrap{position:relative; z-index:1; width:100%; max-width:460px; margin:0 auto; padding:22px 18px 34px}
+  .brand{display:flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.24em;
+    color:var(--dim); text-transform:uppercase}
+  .brand b{color:var(--teal); font-weight:600; letter-spacing:.24em}
+  .hero{margin:16px 0 0}
+  .now{font-size:13px; color:var(--dim)}
+  .temp{display:flex; align-items:baseline; gap:6px; margin:6px 0 2px}
+  .temp .n{font-size:64px; line-height:1; font-weight:600; letter-spacing:-.02em}
+  .temp .u{font-size:15px; color:var(--dim)}
+  .sub{font-size:13px; color:var(--dim)}
+  .desc{font-size:14px; line-height:1.55; margin-top:10px; color:#cfdcdd}
+  .warn{display:inline-block; margin-top:10px; padding:7px 12px; border-radius:10px;
+    background:rgba(240,180,90,.12); border:1px solid rgba(240,180,90,.35); color:#ffd7a1; font-size:13px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:14px}
+  .k{font-size:11px; color:var(--dim); letter-spacing:.12em}
+  .holiday .days{display:flex; align-items:baseline; gap:6px; margin-top:8px}
+  .holiday .days .n{font-size:46px; font-weight:600; color:var(--teal); line-height:1}
+  .holiday .days .u{font-size:13px; color:var(--dim)}
+  .holiday .nm{font-size:17px; margin-top:8px}
+  .holiday .dt{font-size:12px; color:var(--dim); margin-top:3px}
+  .rain{margin-top:14px}
+  .rain .row{display:flex; justify-content:space-between; font-size:14px; padding:6px 0; border-bottom:1px dashed var(--line)}
+  .rain .row:last-child{border:0}
+  .rain .mm{color:var(--teal)}
+  .ok{color:var(--dim); font-size:13px}
+  .days5{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-top:12px; scrollbar-width:none}
+  .days5::-webkit-scrollbar{display:none}
+  .d{min-width:86px; background:rgba(255,255,255,.03); border:1px solid var(--line);
+    border-radius:12px; padding:10px 9px; flex:0 0 auto}
+  .d .w{font-size:11px; color:var(--dim)}
+  .d .dd{font-size:15px; margin-top:3px}
+  .d .t{font-size:12px; color:var(--teal); margin-top:6px}
+  .d .p{font-size:11px; color:var(--dim); margin-top:4px}
+  .foot{margin-top:22px; font-size:11px; color:var(--dim); line-height:1.7}
+  .foot a{color:var(--dim)}
+  .err{color:#ffb3b3}
+</style>
+</head>
+<body>
+<div class="wind"></div>
+<div class="wrap">
+  <div class="brand">AI PASSPORT <b>· NFC 快掃</b></div>
+
+  <div class="hero">
+    <div class="now" id="now">香港天文台</div>
+    <div class="temp"><span class="n" id="temp">--</span><span class="u">°C</span></div>
+    <div class="sub" id="sub">濕度 -- · 更新 --</div>
+    <div class="desc" id="desc"></div>
+    <div id="warn"></div>
+  </div>
+
+  <div class="card holiday">
+    <div class="k">下一個公眾假期</div>
+    <div class="days"><span class="n" id="hd">--</span><span class="u">日後</span></div>
+    <div class="nm" id="hn">--</div>
+    <div class="dt" id="hdt"></div>
+  </div>
+
+  <div class="card rain">
+    <div class="k">過去一小時雨量</div>
+    <div id="rain" class="ok">讀取中…</div>
+  </div>
+
+  <div class="card">
+    <div class="k">未來幾日</div>
+    <div class="days5" id="fnd"></div>
+  </div>
+
+  <div class="foot" id="foot">
+    資料來源：香港天文台（每 5 分鐘自動更新）· 假期：1823<br>
+    離線時顯示上一次讀到嘅數值。
+  </div>
+</div>
+
+<script>
+const HOL = [{"d": "2026-12-25", "n": "聖誕節"}, {"d": "2026-12-26", "n": "聖誕節後第一個周日"}, {"d": "2027-01-01", "n": "一月一日"}, {"d": "2027-02-06", "n": "農曆年初一"}, {"d": "2027-02-08", "n": "農曆年初三"}, {"d": "2027-02-09", "n": "農曆年初四"}, {"d": "2027-03-26", "n": "耶穌受難節"}, {"d": "2027-03-27", "n": "耶穌受難節翌日"}, {"d": "2027-03-29", "n": "復活節星期一"}, {"d": "2027-04-05", "n": "清明節"}, {"d": "2027-05-01", "n": "勞動節"}, {"d": "2027-05-13", "n": "佛誕"}, {"d": "2027-06-09", "n": "端午節"}, {"d": "2027-07-01", "n": "香港特別行政區成立紀念日"}, {"d": "2027-09-16", "n": "中秋節翌日"}, {"d": "2027-10-01", "n": "國慶日"}, {"d": "2027-10-08", "n": "重陽節"}, {"d": "2027-12-25", "n": "聖誕節"}, {"d": "2027-12-27", "n": "聖誕節後第一個周日"}];
+
+function pad(n){return String(n).padStart(2,"0")}
+function ymd(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+const WD = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+
+(function(){
+  const t = new Date(); t.setHours(0,0,0,0);
+  const next = HOL.find(h => new Date(h.d+"T00:00:00") >= t);
+  if(!next) return;
+  const d = new Date(next.d+"T00:00:00");
+  const days = Math.round((d - t)/86400000);
+  document.getElementById("hd").textContent = days;
+  document.getElementById("hn").textContent = next.n;
+  document.getElementById("hdt").textContent =
+    (d.getMonth()+1)+"月"+d.getDate()+"日 · "+WD[d.getDay()]+"（今日起 "+days+" 日）";
+  if(days===0) document.getElementById("hd").textContent = "今";
+})();
+
+const URL_NOW = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc";
+const FND = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc";
+
+function setText(id, s){ document.getElementById(id).textContent = s }
+
+function renderNow(j){
+  const temps = (j.temperature && j.temperature.data) || [];
+  const pick = temps.find(x => x.place === "香港天文台") || temps[0];
+  if(pick) setText("temp", pick.value);
+  const hum = (j.humidity && j.humidity.data && j.humidity.data[0]) || null;
+  let s = "濕度 " + (hum ? hum.value + "%" : "--");
+  const up = (j.updateTime||"").slice(11,16);
+  window.__nowUp = up;
+  if(up) s += " · 更新 " + up;
+  setText("sub", s);
+  updateFoot();
+  const w = (j.warningMessage||"").trim();
+  const box = document.getElementById("warn");
+  if(w) box.innerHTML = '<div class="warn">'+w+'</div>'; else box.innerHTML="";
+
+  const rf = (j.rainfall && j.rainfall.data) || [];
+  const hit = rf.filter(x => typeof x.max === "number" && x.max > 0)
+                .sort((a,b)=>b.max-a.max).slice(0,6);
+  const el = document.getElementById("rain");
+  const today = j.rainfallFrom00To12;
+  const tline = (typeof today === "number" && today > 0) ? "今日 00–12 時累計 "+today+" mm" : "";
+  if(!rf.length){ el.className="ok"; el.textContent="今次讀唔到雨量資料"; }
+  else if(!hit.length){ el.className="ok"; el.textContent="過去一小時各區都冇錄得雨量" + (tline?" · "+tline:""); }
+  else{
+    el.className="";
+    el.innerHTML = hit.map(x=>'<div class="row"><span>'+x.place+'</span><span class="mm">'+x.max+' mm</span></div>').join("");
+  }
+}
+
+function renderFnd(j){
+  const list = (j.weatherForecast||[]).slice(0,5);
+  if(list[0]){
+    const tmin = list[0].forecastMintemp ? list[0].forecastMintemp.value : null;
+    const tmax = list[0].forecastMaxtemp ? list[0].forecastMaxtemp.value : null;
+    const rng = (tmin!==null && tmax!==null) ? "（今日 "+tmin+"–"+tmax+"°C）" : "";
+    document.getElementById("desc").textContent = (list[0].forecastWeather||"") + rng;
+  }
+  window.__fndUp = (j.updateTime||"").slice(11,16);
+  updateFoot();
+  const wrap = document.getElementById("fnd");
+  wrap.innerHTML = list.map(f=>{
+    const ds = f.forecastDate;
+    const d = new Date(ds.slice(0,4)+"-"+ds.slice(4,6)+"-"+ds.slice(6,8)+"T00:00:00");
+    const t = (f.forecastMintemp?f.forecastMintemp.value:"?")+"–"+(f.forecastMaxtemp?f.forecastMaxtemp.value:"?")+"°";
+    return '<div class="d"><div class="w">'+WD[d.getDay()]+'</div><div class="dd">'
+      + (d.getMonth()+1)+'/'+d.getDate()+'</div><div class="t">'+t
+      + '</div><div class="p">雨 '+(f.PSR||"—")+'</div></div>';
+  }).join("");
+}
+
+function updateFoot(){
+  const up = window.__nowUp || window.__fndUp || "";
+  document.getElementById("foot").innerHTML =
+    "資料來源：香港天文台（"+(up?"更新 "+up+"，":"")+"每 5 分鐘自動重讀）· 假期：1823<br>離線時顯示上一次讀到嘅數值。";
+}
+
+function load(url, fn, tag){
+  fetch(url, {cache:"no-store"}).then(r=>r.json()).then(j=>{
+    fn(j); localStorage.setItem("hk_"+tag, JSON.stringify(j));
+  }).catch(()=>{
+    const c = localStorage.getItem("hk_"+tag);
+    if(c) fn(JSON.parse(c));
+  });
+}
+load(URL_NOW, renderNow, "now");
+load(FND, renderFnd, "fnd");
+setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
+</script>
+</body>
+</html>
