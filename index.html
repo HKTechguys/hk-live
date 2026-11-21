@@ -34,8 +34,6 @@
   .temp .u{font-size:15px; color:var(--dim)}
   .sub{font-size:13px; color:var(--dim)}
   .desc{font-size:14px; line-height:1.55; margin-top:10px; color:#cfdcdd}
-  .warn{display:inline-block; margin-top:10px; padding:7px 12px; border-radius:10px;
-    background:rgba(240,180,90,.12); border:1px solid rgba(240,180,90,.35); color:#ffd7a1; font-size:13px}
   .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:14px}
   .k{font-size:11px; color:var(--dim); letter-spacing:.12em}
   .holiday .days{display:flex; align-items:baseline; gap:6px; margin-top:8px}
@@ -58,12 +56,33 @@
   .d .p{font-size:11px; color:var(--dim); margin-top:4px}
   .foot{margin-top:22px; font-size:11px; color:var(--dim); line-height:1.7}
   .foot a{color:var(--dim)}
-  .err{color:#ffb3b3}
+  .banner{display:none; margin:0 0 14px; padding:13px 14px; border-radius:14px;
+    font-size:14px; line-height:1.5; font-weight:600; letter-spacing:.02em;
+    background:rgba(240,180,90,.14); border:1px solid rgba(240,180,90,.45); color:#ffdda8}
+  body[data-lv="2"]{--teal:#f7c15e}
+  body[data-lv="2"] .banner{display:block; background:rgba(247,193,94,.16);
+    border-color:rgba(247,193,94,.5); color:#ffe3ad}
+  body[data-lv="3"]{--teal:#ff7b7b}
+  body[data-lv="3"] .banner{display:block;
+    background:linear-gradient(180deg,rgba(255,86,86,.30),rgba(255,86,86,.12));
+    border-color:rgba(255,110,110,.6); color:#ffdede}
+  body[data-lv="3"] .card{border-color:rgba(255,120,120,.35)}
+  .krow{display:flex; align-items:center; gap:8px}
+  .rsw{margin-left:auto; display:flex; gap:6px}
+  .rsw button{font:inherit; font-size:11px; color:var(--dim); background:rgba(255,255,255,.05);
+    border:1px solid var(--line); border-radius:8px; padding:4px 9px; cursor:pointer}
+  .rsw button[aria-pressed="true"]{color:var(--teal); border-color:var(--teal)}
+  .shot{position:relative; margin-top:10px; padding-top:100%;
+    overflow:hidden; border-radius:12px; background:#04121a}
+  .shot img{position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:left center}
+  body[data-lv="2"] .holiday .days .n,body[data-lv="3"] .holiday .days .n{color:var(--ink)}
 </style>
 </head>
 <body>
 <div class="wind"></div>
 <div class="wrap">
+  <div class="banner" id="banner"></div>
   <div class="brand">AI PASSPORT <b>· NFC 快掃</b></div>
 
   <div class="hero">
@@ -71,7 +90,6 @@
     <div class="temp"><span class="n" id="temp">--</span><span class="u">°C</span></div>
     <div class="sub" id="sub">濕度 -- · 更新 --</div>
     <div class="desc" id="desc"></div>
-    <div id="warn"></div>
   </div>
 
   <div class="card holiday">
@@ -84,6 +102,18 @@
   <div class="card rain">
     <div class="k">過去一小時雨量</div>
     <div id="rain" class="ok">讀取中…</div>
+  </div>
+
+  <div class="card radar">
+    <div class="krow">
+      <div class="k">雷達雨區</div>
+      <div class="rsw">
+        <button id="r128" aria-pressed="true">128km</button>
+        <button id="r256" aria-pressed="false">256km</button>
+      </div>
+    </div>
+    <div class="shot"><img id="radarimg" alt="香港天文台雷達雨區圖" referrerpolicy="no-referrer"></div>
+    <div class="ok" id="radartime" style="margin-top:9px">讀取中…</div>
   </div>
 
   <div class="card">
@@ -133,9 +163,7 @@ function renderNow(j){
   if(up) s += " · 更新 " + up;
   setText("sub", s);
   updateFoot();
-  const w = (j.warningMessage||"").trim();
-  const box = document.getElementById("warn");
-  if(w) box.innerHTML = '<div class="warn">'+w+'</div>'; else box.innerHTML="";
+  applyWarn((j.warningMessage||"").trim());
 
   const rf = (j.rainfall && j.rainfall.data) || [];
   const hit = rf.filter(x => typeof x.max === "number" && x.max > 0)
@@ -178,6 +206,60 @@ function updateFoot(){
     "資料來源：香港天文台（"+(up?"更新 "+up+"，":"")+"每 5 分鐘自動重讀）· 假期：1823<br>離線時顯示上一次讀到嘅數值。";
 }
 
+// ---- 警告分類:1 提示 / 2 戒備 / 3 嚴重 ----
+const WLV = [
+  {lv:3, re:/(十號|九號|八號|黑色暴雨)/},
+  {lv:2, re:/(三號|紅色暴雨|海嘯)/},
+  {lv:1, re:/(一號|黃色暴雨|雷暴|季候風|酷熱|寒冷|霜凍|火災|山泥傾瀉|霜|結冰)/}
+];
+function applyWarn(msg){
+  const box = document.getElementById("banner");
+  if(!msg){ box.style.display="none"; document.body.removeAttribute("data-lv"); return; }
+  const hit = WLV.find(w => w.re.test(msg));
+  document.body.dataset.lv = hit ? hit.lv : 1;
+  box.textContent = msg.replace(/。$/,"");
+  box.style.display = "block";
+}
+
+// ---- 雷達雨區(天文台圖檔,每 6 分鐘一張) ----
+const RAD = {
+  "128": {dir:"rad_128_png", pre:"2d128nradar_"},
+  "256": {dir:"rad_256_png", pre:"2d256nradar_"}
+};
+let radRange = "128";
+document.getElementById("r128").addEventListener("click", () => setRange("128"));
+document.getElementById("r256").addEventListener("click", () => setRange("256"));
+function setRange(r){
+  radRange = r;
+  document.getElementById("r128").setAttribute("aria-pressed", r==="128");
+  document.getElementById("r256").setAttribute("aria-pressed", r==="256");
+  loadRadar();
+}
+function stamp(d){
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+pad(d.getHours())+pad(d.getMinutes());
+}
+function loadRadar(){
+  const cfg = RAD[radRange];
+  const img = document.getElementById("radarimg");
+  const lab = document.getElementById("radartime");
+  const base = new Date();
+  base.setMinutes(base.getMinutes() - base.getMinutes()%6);
+  base.setSeconds(0,0);
+  let i = 0;
+  lab.textContent = "讀取中…";
+  function tick(){
+    if(i > 9){ lab.textContent = "雷達圖暫時讀唔到，第 6 分鐘再試"; return; }
+    const t = new Date(base.getTime() - i*6*60000);
+    i++;
+    img.onerror = tick;
+    img.onload = () => {
+      lab.textContent = radRange+" 公里範圍 · 圖像 "+pad(t.getHours())+":"+pad(t.getMinutes())+" HKT · 每 6 分鐘更新";
+    };
+    img.src = "https://www.hko.gov.hk/wxinfo/radars/"+cfg.dir+"/"+cfg.pre+stamp(t)+".jpg";
+  }
+  tick();
+}
+
 function load(url, fn, tag){
   fetch(url, {cache:"no-store"}).then(r=>r.json()).then(j=>{
     fn(j); localStorage.setItem("hk_"+tag, JSON.stringify(j));
@@ -188,7 +270,9 @@ function load(url, fn, tag){
 }
 load(URL_NOW, renderNow, "now");
 load(FND, renderFnd, "fnd");
+loadRadar();
 setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
+setInterval(loadRadar, 360000);
 </script>
 </body>
 </html>
