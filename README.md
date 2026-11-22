@@ -3,6 +3,18 @@
 香港即時資訊單頁（即時天氣／雨量／假期、停車場、路邊感應咪錶、手沖咖啡、漁護署遠足徑），
 地圖頁的圖層由左下角開關控制，清單用底部面板。
 
+## 咪錶即時（開住面板就更新）
+
+咪錶面板（`#meter`）開着時，瀏覽器直連運輸署原始 CSV
+`https://resource.data.one.gov.hk/td/psiparkingspaces/occupancystatus/occupancystatus.csv`（CORS `*`、CDN 只緩 60 秒），
+即場比對新舊狀態，唔使等 workflow：
+
+- 有設定「☆ 提醒」時每 75 秒拉一次（等同 ~1 分鐘延遲，夠貼近官方「實時」）；
+- 冇提醒時每 3 分鐘；
+- 開咗省流模式或 2G 就 5 分鐘；收起面板即停。
+
+每次約 716 KB（無 gzip）。關掉網頁之後的通知靠下面 workflow。
+
 ## WhatsApp 咪錶有位通知（免開網頁）
 
 `tools/refresh_parking.py` 每 10 分鐘重建 `data/meters.json`；
