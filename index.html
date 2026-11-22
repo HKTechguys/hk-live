@@ -340,19 +340,25 @@ function applyWarn(msg){
   if(!msg){ box.style.display="none"; document.body.removeAttribute("data-lv"); return; }
   const hit = WLV.find(w => w.re.test(msg));
   document.body.dataset.lv = hit ? hit.lv : 1;
-  box.textContent = msg.replace(/。/,"");
+  box.textContent = msg.replace(/。$/, "");
   box.style.display = "block";
 }
 
 // ---- 雷達雨區(天文台圖檔,每 6 分鐘一張,逐格播放) ----
+// 假設:HKO 圖檔固定 577×400、白色圖例由 x=400 起,所以 .shot 用 cover 裁走右邊圖例。
 const RAD = {
   "64":  {dir:"rad_064_png", pre:"2d064nradar_"},
   "128": {dir:"rad_128_png", pre:"2d128nradar_"},
   "256": {dir:"rad_256_png", pre:"2d256nradar_"}
 };
 const RADS = ["64","128","256"];
-const RAD_N = 6;              // 動畫格數(6 格 = 近 30 分鐘)
-let radRange = "64", radFrames = [], radIdx = 0, radTimer = null, radPlay = true, radStarted = false, radLoops = 2;
+const RAD_N = 6;            // 動畫格數(6 格 = 近 30 分鐘)
+const RAD_STEP = 6*60000;   // 每格相隔 6 分鐘
+const RAD_FRAME = 650;      // 每格播幾多毫秒
+const RAD_LOOP = 2;         // 播幾輪就停
+const RAD_WAIT = 8000;      // 等圖上限,過時就用已載入嘅格
+const radar = {range:"64", frames:[], i:0, timer:null, play:true, loops:0, token:0};
+
 RADS.forEach(r => {
   const b = document.getElementById("r"+r);
   if(b) b.addEventListener("click", () => setRange(r));
@@ -360,114 +366,127 @@ RADS.forEach(r => {
 document.getElementById("radarplay").addEventListener("click", togglePlay);
 
 function radUrl(t){
-  const c = RAD[radRange];
+  const c = RAD[radar.range];
   return "https://www.hko.gov.hk/wxinfo/radars/"+c.dir+"/"+c.pre+stamp(t)+".jpg";
 }
-function radLabel(t){ return radRange+"km · "+pad(t.getHours())+":"+pad(t.getMinutes())+" HKT"; }
+function radLabel(t){ return radar.range+"km · "+pad(t.getHours())+":"+pad(t.getMinutes())+" HKT"; }
+function setCap(s){ document.getElementById("radartime").textContent = s; }
+function setBtn(play, text){
+  const b = document.getElementById("radarplay");
+  b.setAttribute("aria-pressed", play);
+  b.textContent = text;
+}
+function cur(){ return radar.frames[radar.i] || radar.frames[radar.frames.length-1]; }
 function setRange(r){
-  radRange = r;
+  radar.range = r;
   RADS.forEach(x => document.getElementById("r"+x).setAttribute("aria-pressed", x===r));
   loadRadar();
 }
-function stopAnim(){ if(radTimer){ clearInterval(radTimer); radTimer = null; } }
+function stopTimer(){ if(radar.timer){ clearInterval(radar.timer); radar.timer = null; } }
 function togglePlay(){
-  radPlay = !radPlay;
-  const b = document.getElementById("radarplay");
-  b.setAttribute("aria-pressed", radPlay);
-  b.textContent = radPlay ? "暫停" : "播放";
-  if(radPlay){ radStarted = false; startAnim(radFrames); }
-  else {
-    stopAnim();
-    const f = radFrames[radIdx];
-    if(f) document.getElementById("radartime").textContent = radLabel(f.t) + " · 已暫停";
-  }
+  radar.play = !radar.play;
+  setBtn(radar.play, radar.play ? "暫停" : "播放");
+  if(radar.play){ begin(); return; }
+  stopTimer();
+  const f = cur();
+  if(f) setCap(radLabel(f.t) + " · 已暫停");
 }
 function loadRadar(){
-  stopAnim(); radFrames = []; radIdx = 0; radStarted = false;
+  stopTimer();
+  const tok = ++radar.token;      // 換咗範圍就唔好再理舊一轉嘅圖
+  radar.frames = []; radar.i = 0; radar.loops = 0;
+  setCap("讀取中…");
   const base = new Date();
   base.setMinutes(base.getMinutes() - base.getMinutes()%6);
   base.setSeconds(0,0);
-  document.getElementById("radartime").textContent = "讀取中…";
-  probe(0);
-  function probe(i){
-    if(i > 9){ document.getElementById("radartime").textContent = "雷達圖暫時讀唔到，第 6 分鐘再試"; return; }
-    const t = new Date(base.getTime() - i*6*60000);
-    const im = new Image();
-    im.onload = () => {
-      document.getElementById("radarimg").src = im.src;
-      document.getElementById("radartime").textContent = radLabel(t) + " · 載入動畫…";
-      prefetch(t);
-    };
-    im.onerror = () => probe(i+1);
-    im.src = radUrl(t);
-  }
+  probe(base, 0, tok);
 }
-function prefetch(tNew){
+function probe(base, k, tok){
+  if(k > 9){ if(tok === radar.token) setCap("雷達圖暫時讀唔到，第 6 分鐘再試"); return; }
+  const t = new Date(base.getTime() - k*RAD_STEP);
+  const im = new Image();
+  im.onload = () => {
+    if(tok !== radar.token) return;
+    document.getElementById("radarimg").src = im.src;
+    setCap(radLabel(t) + " · 載入動畫…");
+    collect(t, tok);
+  };
+  im.onerror = () => { if(tok === radar.token) probe(base, k+1, tok); };
+  im.src = radUrl(t);
+}
+function collect(tNew, tok){
   const items = [];
-  let done = 0;
-  const fin = () => { done++; if(done === RAD_N) startAnim(items); };
+  let done = 0, closed = false;
+  const settle = force => {
+    if(closed || (!force && done < RAD_N)) return;
+    closed = true;
+    if(tok !== radar.token) return;
+    radar.frames = items.slice().sort((a,b) => a.t - b.t);
+    if(!radar.frames.length){ setCap("雷達圖載入太慢，第 6 分鐘再試"); return; }
+    if(radar.frames.length < 2){
+      radar.play = false; setBtn(false, "播放");
+      document.getElementById("radarimg").src = radar.frames[0].src;
+      setCap(radLabel(radar.frames[0].t) + " · 網速慢，只顯示最新一張");
+      return;
+    }
+    begin();
+  };
   for(let k = RAD_N-1; k >= 0; k--){
-    const t = new Date(tNew.getTime() - k*6*60000);
+    const t = new Date(tNew.getTime() - k*RAD_STEP);
     const im = new Image();
-    im.onload = () => { items.push({t:t, src:im.src}); fin(); };
-    im.onerror = fin;
+    im.onload = () => { if(tok === radar.token) items.push({t:t, src:im.src}); done++; settle(false); };
+    im.onerror = () => { done++; settle(false); };
     im.src = radUrl(t);
   }
+  setTimeout(() => settle(true), RAD_WAIT);
 }
-function startAnim(items){
-  if(radStarted) return;
-  radFrames = (items || []).slice().sort((a,b) => a.t - b.t);
-  if(!radFrames.length) return;
-  if(!radPlay || radFrames.length < 2){
-    document.getElementById("radarimg").src = radFrames[radFrames.length-1].src;
-    document.getElementById("radartime").textContent = radLabel(radFrames[radFrames.length-1].t) + " · 按「播放」睇動畫";
-    return;
-  }
-  radStarted = true;
-  stopAnim();
-  radIdx = 0; radLoops = 2;
+function begin(){
+  if(!radar.frames.length) return;
+  if(!radar.play){ pausedView(); return; }
+  stopTimer();
+  radar.i = 0; radar.loops = RAD_LOOP;
   showFrame();
-  radTimer = setInterval(() => {
-    radIdx++;
-    if(radIdx >= radFrames.length){
-      radIdx = 0;
-      radLoops--;
-      if(radLoops <= 0){
-        // 播完兩輪就停在最新一格,慳電慳數據
-        stopAnim();
-        radPlay = false;
-        radIdx = radFrames.length - 1;
-        const b = document.getElementById("radarplay");
-        b.setAttribute("aria-pressed", false);
-        b.textContent = "播放";
-        const f = radFrames[radIdx];
-        document.getElementById("radarimg").src = f.src;
-        document.getElementById("radartime").textContent =
-          radLabel(f.t) + " · 按「播放」再播";
-        return;
-      }
+  radar.timer = setInterval(tick, RAD_FRAME);
+}
+function pausedView(){
+  radar.i = radar.frames.length - 1;
+  document.getElementById("radarimg").src = cur().src;
+  setCap(radLabel(cur().t) + " · 按「播放」睇動畫");
+}
+function tick(){
+  radar.i++;
+  if(radar.i >= radar.frames.length){
+    radar.i = 0;
+    radar.loops--;
+    if(radar.loops <= 0){
+      // 播完兩輪就停在最新一格,慳電慳數據
+      stopTimer();
+      radar.play = false;
+      setBtn(false, "播放");
+      radar.i = radar.frames.length - 1;
+      document.getElementById("radarimg").src = cur().src;
+      setCap(radLabel(cur().t) + " · 按「播放」再播");
+      return;
     }
-    showFrame();
-  }, 650);
+  }
+  showFrame();
 }
 function showFrame(){
-  const f = radFrames[radIdx];
+  const f = cur();
   if(!f) return;
   document.getElementById("radarimg").src = f.src;
-  document.getElementById("radartime").textContent =
-    radLabel(f.t) + " · 近 " + (radFrames.length*6) + " 分鐘逐格播";
+  setCap(radLabel(f.t) + " · 近 " + (radar.frames.length*6) + " 分鐘逐格播");
 }
 document.addEventListener("visibilitychange", () => {
-  if(document.hidden) stopAnim();
-  else if(radPlay && radFrames.length > 1 && !radTimer){ radStarted = false; startAnim(radFrames); }
+  if(document.hidden){ stopTimer(); return; }
+  if(radar.play && radar.frames.length > 1 && !radar.timer) begin();
 });
 function stamp(d){
   return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+pad(d.getHours())+pad(d.getMinutes());
 }
-
 function load(url, fn, tag){
   fetch(url, {cache:"no-store"}).then(r=>r.json()).then(j=>{
-    fn(j); localStorage.setItem("hk_"+tag, JSON.stringify(j));
+    fn(j); try{ localStorage.setItem("hk_"+tag, JSON.stringify(j)); }catch(e){}
   }).catch(()=>{
     const c = localStorage.getItem("hk_"+tag);
     if(c) fn(JSON.parse(c));
