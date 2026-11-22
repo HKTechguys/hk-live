@@ -215,6 +215,34 @@ body{overflow:hidden;height:100vh}
 .cf-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
   border-top:1px dashed var(--line);padding-top:10px}
 
+/* ---------- 山徑 tab ---------- */
+#p-trail{padding-top:var(--tabh);height:100vh;overflow-y:auto;overflow-x:hidden;background:var(--bg)}
+.tr-mapwrap{position:relative;height:44vh;min-height:250px;background:#070a10}
+#tmap{position:absolute;inset:0}
+.tr-hud{top:10px!important}
+.tr-tools{bottom:12px!important}
+.tr-legend{bottom:12px!important}
+.tr-body{max-width:640px;margin:0 auto;padding:14px 16px 40px}
+.tr-head h2{font-size:17px;margin:0 0 4px;letter-spacing:.02em}
+.tr-head p{font-size:11.5px;color:var(--dim);margin:0;line-height:1.6}
+.tr-q{width:100%;margin:12px 0 6px;font:inherit;font-size:12.5px;padding:9px 12px;
+  border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--ink)}
+.tr-count{font-size:11px;color:var(--dim);margin:2px 0 10px}
+.tr-list{display:flex;flex-direction:column;gap:8px}
+.tr-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
+.tr-card.sel{border-color:rgba(197,140,255,.55);background:rgba(197,140,255,.06)}
+.tr-card .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.tr-card h3{margin:0;font-size:14px;line-height:1.35}
+.tr-card .km{font-size:12px;font-variant-numeric:tabular-nums;color:var(--teal);white-space:nowrap}
+.tr-card .sub{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.tr-card .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.tr-card .acts button,.tr-card .acts a{font:inherit;font-size:11px;text-decoration:none;
+  border:1px solid rgba(84,216,196,.4);background:rgba(84,216,196,.08);color:var(--teal);
+  border-radius:8px;padding:5px 10px;cursor:pointer}
+.tr-card .acts a{border-color:var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
+.tr-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
+  border-top:1px dashed var(--line);padding-top:10px}
+
 /* ---------- popup ---------- */
 .maplibregl-popup-content{
   background:#0d131d;color:#eaf6f5;border:1px solid #1d2836;border-radius:11px;
@@ -249,6 +277,7 @@ body{overflow:hidden;height:100vh}
 <nav class="tabbar" role="tablist" aria-label="頁面分頁">
   <button role="tab" id="tab-now" aria-selected="true" aria-controls="p-now">即時</button>
   <button role="tab" id="tab-park" aria-selected="false" aria-controls="p-park">泊車</button>
+  <button role="tab" id="tab-trail" aria-selected="false" aria-controls="p-trail">山徑</button>
   <button role="tab" id="tab-cafe" aria-selected="false" aria-controls="p-cafe">Cafe</button>
   <span class="sp"></span>
   <span class="live" id="tab-live"></span>
@@ -694,6 +723,43 @@ setInterval(loadRadar, 720000);
   </div>
 </section>
 
+<section class="tabpage" id="p-trail" role="tabpanel" aria-labelledby="tab-trail">
+  <div class="tr-mapwrap">
+    <div id="tmap"></div>
+    <div class="pk-hud tr-hud">
+      <div class="pk-chip"><i>路線</i><b class="g" id="tr-n">—</b></div>
+      <div class="pk-chip"><i>標距柱</i><b class="y" id="tr-p">—</b></div>
+      <div class="pk-chip"><i>合計長度</i><b id="tr-km">—</b></div>
+    </div>
+    <div class="pk-tools tr-tools">
+      <button id="tr-tg-lines" aria-pressed="true">路線</button>
+      <button id="tr-tg-posts" aria-pressed="true">標距柱</button>
+      <button id="tr-fit">全港視圖</button>
+    </div>
+    <div class="pk-legend tr-legend">
+      <span class="h">圖例</span>
+      <s style="background:#54d8c4"></s>遠足徑<br>
+      <s style="background:#ffd166"></s>漁護署標距柱（zoom ≥ 12）<br>
+      <s style="background:#c58cff"></s>已選路線
+    </div>
+  </div>
+
+  <div class="tr-body">
+    <div class="tr-head">
+      <h2>郊野公園遠足徑</h2>
+      <p id="tr-sub">載入中…</p>
+    </div>
+    <input id="tr-q" type="search" class="tr-q" placeholder="路線名，例如 麥理浩徑 / 衛奕信徑 / 家樂徑">
+    <div class="tr-count" id="tr-count"></div>
+    <div class="tr-list" id="tr-list"></div>
+    <div class="tr-note">
+      幾何來自 OpenStreetMap 的 route=hiking 路線（© OpenStreetMap contributors，ODbL）；
+      標距柱點位來自漁農自然護理署開放數據（AFCD_Distance_Post.csv）。
+      長度為沿線幾何累加估算，只作參考；實際路況、封閉安排與難度請以漁護署官方公布為準。
+    </div>
+  </div>
+</section>
+
 <section class="tabpage" id="p-cafe" role="tabpanel" aria-labelledby="tab-cafe">
   <div class="cf-wrap">
     <div class="cf-top">
@@ -719,7 +785,8 @@ setInterval(loadRadar, 720000);
 (function(){
   "use strict";
 
-  var ST = { parks:[], meters:[], cafes:[], pm:{}, mm:{}, cm:{}, map:null, booted:false };
+  var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], pm:{}, mm:{}, cm:{}, trailMeta:{}, map:null, booted:false };
+  var TM = { map:null, booted:false, loaded:false, loading:false, hl:-1, tg:{lines:true, posts:true} };
   var esc = function(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -737,7 +804,7 @@ setInterval(loadRadar, 720000);
   var num = function(n){ return Number(n).toLocaleString(); };
 
   /* ---------- tabs ---------- */
-  var TABS = [["tab-now","p-now"],["tab-park","p-park"],["tab-cafe","p-cafe"]];
+  var TABS = [["tab-now","p-now"],["tab-park","p-park"],["tab-trail","p-trail"],["tab-cafe","p-cafe"]];
   function showTab(key){
     TABS.forEach(function(t){
       var btn = document.getElementById(t[0]);
@@ -749,6 +816,11 @@ setInterval(loadRadar, 720000);
     if (key === "tab-park") {
       bootMap();
       setTimeout(function(){ if (ST.map) ST.map.resize(); }, 60);
+    }
+    if (key === "tab-trail") {
+      bootTrailMap();
+      ensureTrails();
+      setTimeout(function(){ if (TM.map) TM.map.resize(); }, 60);
     }
     try { history.replaceState(null, "", "#" + key.replace("tab-","")); } catch(e){}
   }
@@ -1043,6 +1115,228 @@ setInterval(loadRadar, 720000);
     });
   }
 
+  /* ---------- 山徑 map ---------- */
+  function bootTrailMap(){
+    if (TM.booted || !window.maplibregl) return;
+    TM.booted = true;
+    var map = new maplibregl.Map({
+      container: "tmap",
+      style: MAP_STYLE,
+      center: [114.16, 22.38], zoom: 11.2, minZoom: 9, maxZoom: 18,
+      attributionControl: false
+    });
+    map.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-left");
+    map.addControl(new maplibregl.AttributionControl({compact:true}), "bottom-left");
+    map.on("style.load", function(){ drawTrailLayers(map); });
+    map.on("load", function(){ drawTrailLayers(map); });
+    TM.map = map;
+  }
+
+  function trailsFC(){
+    return {type:"FeatureCollection", features:(ST.trails||[]).map(function(t,i){
+      return {type:"Feature",
+        geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
+          return l.map(function(p){ return [p[1], p[0]]; });
+        })},
+        properties:{i:i, n:t.n, e:t.e, len:t.len}};
+    })};
+  }
+  function postsFC(){
+    return {type:"FeatureCollection", features:(ST.posts||[]).map(function(p){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[p[3], p[2]]},
+        properties:{id:p[0], t:p[1]}};
+    })};
+  }
+  function hlFC(i){
+    if (i < 0) return {type:"FeatureCollection", features:[]};
+    var t = ST.trails[i];
+    if (!t) return {type:"FeatureCollection", features:[]};
+    return {type:"FeatureCollection", features:[{type:"Feature",
+      geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
+        return l.map(function(p){ return [p[1], p[0]]; });
+      })},
+      properties:{i:i}}]};
+  }
+
+  function drawTrailLayers(map){
+    if (map.getSource("trails")) { syncTrailLayers(map); return; }
+    if (!map.isStyleLoaded()) {
+      if (map.__tpending) return;
+      map.__tpending = true;
+      setTimeout(function(){ map.__tpending = false; drawTrailLayers(map); }, 200);
+      return;
+    }
+
+    map.addSource("trails", {type:"geojson", data: trailsFC()});
+    map.addLayer({
+      id:"trail-line", type:"line", source:"trails",
+      paint:{
+        "line-color":"#54d8c4",
+        "line-opacity":["interpolate",["linear"],["zoom"],9,.35,13,.55,16,.7],
+        "line-width":["interpolate",["linear"],["zoom"],9,0.8,12,1.6,15,2.6,18,4]
+      }
+    });
+
+    map.addSource("trail-hl", {type:"geojson", data: hlFC(-1)});
+    map.addLayer({
+      id:"trail-hl", type:"line", source:"trail-hl",
+      paint:{"line-color":"#c58cff", "line-width":["interpolate",["linear"],["zoom"],10,2.2,16,5.5],
+             "line-opacity":.95}
+    });
+
+    map.addSource("posts", {type:"geojson", data: postsFC()});
+    map.addLayer({
+      id:"post-dot", type:"circle", source:"posts", minzoom:12,
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],12,2.6,17,6],
+        "circle-color":"#ffd166",
+        "circle-stroke-width":1, "circle-stroke-color":"rgba(7,10,16,.85)"
+      }
+    });
+
+    map.on("click","post-dot", function(e){
+      var q = e.features[0].properties;
+      new maplibregl.Popup({maxWidth:"240px"}).setLngLat(e.features[0].geometry.coordinates)
+        .setHTML('<div class="pp"><h4>標距柱 '+esc(q.id)+'</h4>'
+          + '<div class="sub">'+esc(q.t||"")+'</div>'
+          + '<div class="row"><span>資料</span><span>漁護署</span></div></div>').addTo(TM.map);
+    });
+    map.on("click","trail-line", function(e){
+      var q = e.features[0].properties;
+      selectTrail(Number(q.i), false);
+      new maplibregl.Popup({maxWidth:"280px"}).setLngLat(e.lngLat)
+        .setHTML('<div class="pp"><h4>'+esc(q.n||q.e)+'</h4>'
+          + '<div class="sub">'+esc(q.e||"")+'</div>'
+          + '<div class="row"><span>約長</span><span>'+q.len+' km</span></div></div>')
+        .addTo(TM.map);
+    });
+    ["trail-line","post-dot"].forEach(function(id){
+      map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
+    });
+
+    syncTrailLayers(map);
+  }
+
+  function syncTrailLayers(map){
+    if (!map || !map.getSource("trails")) return;
+    if (ST.trails.length) map.getSource("trails").setData(trailsFC());
+    if (ST.posts.length) map.getSource("posts").setData(postsFC());
+    applyTrailToggles();
+  }
+
+  function applyTrailToggles(){
+    var map = TM.map;
+    if (!map || !map.getLayer("trail-line")) return;
+    map.setLayoutProperty("trail-line", "visibility", TM.tg.lines ? "visible" : "none");
+    map.setLayoutProperty("post-dot", "visibility", TM.tg.posts ? "visible" : "none");
+  }
+
+  function boundsOf(i){
+    var t = ST.trails[i];
+    if (!t) return null;
+    var b = new maplibregl.LngLatBounds();
+    t.lines.forEach(function(l){ l.forEach(function(p){ b.extend([p[1], p[0]]); }); });
+    return b;
+  }
+
+  function selectTrail(i, fly){
+    if (!ST.trails[i]) return;
+    TM.hl = i;
+    if (TM.map && TM.map.getSource("trail-hl")) TM.map.getSource("trail-hl").setData(hlFC(i));
+    Array.prototype.forEach.call(document.querySelectorAll(".tr-card"), function(c){
+      c.classList.toggle("sel", Number(c.getAttribute("data-i")) === i);
+    });
+    var card = document.querySelector('.tr-card[data-i="'+i+'"]');
+    if (fly) {
+      var page = document.getElementById("p-trail");
+      if (page) page.scrollTo({top:0, behavior:"smooth"});
+    } else {
+      if (card && card.scrollIntoView) card.scrollIntoView({block:"center", behavior:"smooth"});
+    }
+    if (fly && TM.map) {
+      var b = boundsOf(i);
+      if (b) TM.map.fitBounds(b, {padding:{top:60,bottom:70,left:40,right:40}, maxZoom:15, duration:700});
+    }
+  }
+
+  function fitAll(){
+    if (!TM.map || !ST.trails.length) return;
+    var b = new maplibregl.LngLatBounds();
+    ST.trails.forEach(function(t){ t.lines.forEach(function(l){ l.forEach(function(p){ b.extend([p[1], p[0]]); }); }); });
+    TM.map.fitBounds(b, {padding:{top:50,bottom:50,left:30,right:30}, duration:700});
+  }
+
+  function renderTrails(){
+    var list = document.getElementById("tr-list");
+    var q = (document.getElementById("tr-q").value || "").trim().toLowerCase();
+    var rows = ST.trails.map(function(t,i){ return {t:t, i:i}; }).filter(function(r){
+      if (!q) return true;
+      return ((r.t.n + " " + r.t.e) || "").toLowerCase().indexOf(q) >= 0;
+    });
+    document.getElementById("tr-count").textContent = q
+      ? "搜到 " + rows.length + " 條路線" : "共 " + ST.trails.length + " 條路線，依長度排序";
+    if (!rows.length) { list.innerHTML = '<div class="tr-card"><div class="sub">冇匹配路線</div></div>'; return; }
+    list.innerHTML = rows.map(function(r){
+      var t = r.t;
+      return '<div class="tr-card'+(TM.hl === r.i ? " sel" : "")+'" data-i="'+r.i+'">'
+        + '<div class="t"><h3>'+esc(t.n || t.e)+'</h3><span class="km">約 '+t.len+' km</span></div>'
+        + (t.e && t.n ? '<div class="sub">'+esc(t.e)+'</div>' : "")
+        + '<div class="acts"><button data-fly="'+r.i+'">在地圖看</button></div>'
+        + "</div>";
+    }).join("");
+    Array.prototype.forEach.call(list.querySelectorAll("button[data-fly]"), function(b){
+      b.addEventListener("click", function(){
+        selectTrail(Number(b.getAttribute("data-fly")), true);
+      });
+    });
+    Array.prototype.forEach.call(list.querySelectorAll(".tr-card[data-i]"), function(c){
+      c.addEventListener("click", function(e){
+        if (e.target.tagName === "BUTTON") return;
+        selectTrail(Number(c.getAttribute("data-i")), true);
+      });
+    });
+  }
+
+  function ensureTrails(){
+    if (TM.loaded || TM.loading) { if (TM.loaded) renderTrails(); return; }
+    TM.loading = true;
+    fetch("data/trails.json?t=" + Date.now()).then(function(r){ return r.json(); }).then(function(d){
+      ST.trails = d.trails || [];
+      ST.posts = d.posts || [];
+      ST.trailMeta = d;
+      TM.loaded = true; TM.loading = false;
+      var km = 0;
+      ST.trails.forEach(function(t){ km += t.len; });
+      document.getElementById("tr-n").textContent = ST.trails.length;
+      document.getElementById("tr-p").textContent = num(ST.posts.length);
+      document.getElementById("tr-km").textContent = Math.round(km) + " km";
+      document.getElementById("tr-sub").textContent =
+        "漁護署郊野公園遠足徑 · " + ST.trails.length + " 條路線 · " + num(ST.posts.length)
+        + " 支標距柱 · 幾何 OpenStreetMap（ODbL）";
+      renderTrails();
+      if (TM.map) syncTrailLayers(TM.map);
+      if (!TM.fitted) { TM.fitted = true; fitAll(); }
+    }).catch(function(){
+      TM.loading = false;
+      document.getElementById("tr-sub").textContent = "山徑資料載入失敗（請用 http 伺服器開啟）";
+    });
+  }
+
+  function wireTrailUI(){
+    document.getElementById("tr-q").addEventListener("input", renderTrails);
+    document.getElementById("tr-fit").addEventListener("click", fitAll);
+    [["tr-tg-lines","lines"],["tr-tg-posts","posts"]].forEach(function(pair){
+      var b = document.getElementById(pair[0]);
+      b.setAttribute("aria-pressed", TM.tg[pair[1]]);
+      b.addEventListener("click", function(){
+        TM.tg[pair[1]] = !TM.tg[pair[1]];
+        b.setAttribute("aria-pressed", TM.tg[pair[1]]);
+        applyTrailToggles();
+      });
+    });
+  }
+
   /* ---------- data ---------- */
   function loadData(){
     var bust = "?t=" + Date.now();
@@ -1083,16 +1377,18 @@ setInterval(loadRadar, 720000);
     });
   }
 
+  window.__hk = { ST: ST, TM: TM };
+
   document.addEventListener("DOMContentLoaded", function(){
-    wireSearch(); wireCafeUI();
-    if (["park","cafe"].indexOf(hash) >= 0) showTab("tab-" + hash);
+    wireSearch(); wireCafeUI(); wireTrailUI();
+    if (["park","cafe","trail"].indexOf(hash) >= 0) showTab("tab-" + hash);
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
   });
 
   window.addEventListener("hashchange", function(){
     var h = (location.hash || "").replace("#","");
-    if (["now","park","cafe"].indexOf(h) >= 0) showTab("tab-" + h);
+    if (["now","park","cafe","trail"].indexOf(h) >= 0) showTab("tab-" + h);
   });
 })();
 
