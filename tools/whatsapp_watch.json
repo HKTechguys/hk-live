@@ -1,0 +1,7 @@
+{
+  "_note": "只推呢啲範圍內嘅咪錶位：streets=街道名、districts=地區、ids=個別位號；全部留空即唔推（避免每 10 分鐘洗版）。max=每條訊息最多列幾個。",
+  "streets": [],
+  "districts": [],
+  "ids": [],
+  "max": 5
+}

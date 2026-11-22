@@ -22,8 +22,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Snapshot previous meter states
+        run: git show HEAD:data/meters.json > /tmp/meters_prev.json || echo '{}' > /tmp/meters_prev.json
+
       - name: Pull Transport Department data and rebuild JSON
         run: python tools/refresh_parking.py
+
+      - name: WhatsApp alert when a watched space turns vacant
+        env:
+          WA_PHONE: ${{ secrets.WA_PHONE }}
+          WA_KEY: ${{ secrets.WA_KEY }}
+        run: python tools/notify_whatsapp.py /tmp/meters_prev.json data/meters.json
 
       - name: Commit if the data moved
         run: |

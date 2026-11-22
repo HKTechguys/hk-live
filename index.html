@@ -278,6 +278,31 @@ body{overflow:hidden;height:100vh}
   border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--dim);cursor:pointer}
 .cf-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
   border-top:1px dashed var(--line);padding-top:10px}
+/* 咪錶位清單 */
+.mt-bar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;flex-wrap:wrap}
+.mt-bar button{font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
+  border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
+.mt-bar button[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45)}
+.mt-bar .cf-count{margin:0}
+.mt-list{display:flex;flex-direction:column;gap:7px}
+.mt-row{border:1px solid var(--line);border-radius:10px;background:#0d151d;overflow:hidden}
+.mt-head{display:flex;align-items:center;gap:10px;padding:9px 11px}
+.mt-open{flex:1;display:flex;align-items:baseline;gap:8px;background:none;border:0;cursor:pointer;
+  color:#dfecef;font:inherit;font-size:12.5px;text-align:left;padding:0}
+.mt-open b{font-weight:600}
+.mt-open span{font-size:10.5px;color:var(--dim)}
+.mt-open em{font-style:normal;color:var(--teal);font-size:11px;font-variant-numeric:tabular-nums}
+.mt-watch{font:inherit;font-size:11px;color:var(--dim);background:rgba(84,216,196,.08);
+  border:1px solid rgba(84,216,196,.32);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
+.mt-watch.on{color:#ffd166;border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.1)}
+.mt-spaces{display:flex;flex-wrap:wrap;gap:6px;padding:0 11px 11px}
+.mt-sp{font:inherit;font-size:10.5px;display:inline-flex;align-items:center;gap:5px;
+  padding:4px 8px;border-radius:7px;border:1px solid var(--line);background:#111a22;
+  color:#c9d6da;cursor:pointer;font-variant-numeric:tabular-nums}
+.mt-sp i{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
+.mt-sp.on{border-color:rgba(255,209,102,.55);color:#ffd166}
+.mt-sp.on i{box-shadow:0 0 0 2px rgba(255,209,102,.25)}
+.mt-sp.mt-more-sp{border-style:dashed;color:var(--teal);background:rgba(84,216,196,.06)}
 
 /* ---------- popup ---------- */
 .maplibregl-popup-content{
@@ -774,6 +799,7 @@ setInterval(loadRadar, 720000);
     <button id="tg-posts" aria-pressed="false">標距柱</button>
     <button id="tg-free" aria-pressed="false">只看有空位</button>
     <button id="open-trail" class="pk-list">山徑 167 段</button>
+    <button id="open-meter" class="pk-list">咪錶 20,735 位</button>
     <button id="open-cafe" class="pk-list">Cafe 446 間</button>
   </div>
 
@@ -804,6 +830,30 @@ setInterval(loadRadar, 720000);
       資料為漁護署郊野公園遠足徑官方圖層（線位、官方長度、起點終點、類型、地區）＋官方標距柱 CSV；
       難度按官方分級（易行／普通／費力／難行／非常難行），官方未評級者列為「未列入」。
       出發前請以漁護署公布的路況與封閉安排為準。
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="p-meter">
+  <div class="sheet-head">
+    <h2>路邊感應咪錶</h2>
+    <button class="sheet-close" data-close="p-meter">收起</button>
+  </div>
+  <div class="inner">
+    <p class="sheet-sub" id="mt-sub">載入中…</p>
+    <div class="cf-search">
+      <input id="mt-q" type="search" placeholder="街道／地區，例如 麼地道">
+      <select id="mt-dist"><option value="">全部地區</option></select>
+    </div>
+    <div class="mt-bar">
+      <button id="mt-onlyfree" aria-pressed="false">只看現在有位</button>
+      <span id="mt-count" class="cf-count"></span>
+    </div>
+    <div class="mt-list" id="mt-list"></div>
+    <button class="cf-more" id="mt-more" style="display:none">顯示更多街道</button>
+    <div class="cf-note">
+      按街道分組，預設按「現在空置位」多寡排序，撳街名可展開該街每個位。<br>
+      按「☆ 提醒」＝整條街任何一個位由佔用中變空置就通知你。狀態資料每 10 分鐘更新。
     </div>
   </div>
 </section>
@@ -1252,28 +1302,57 @@ setInterval(loadRadar, 720000);
       toast("已加入提醒 · " + (name || id) + "，變空置會通知你");
     }
     wtPersist();
+    if (typeof renderMeters === "function") renderMeters();
   }
   function wtNotice(w){
-    var title = "有位！" + (w.n || "路邊泊車位");
+    var title, body;
+    if (w.street) { title = "有位！" + w.street; body = w.cnt + " 個位剛空出：" + w.ids.join("、"); }
+    else { title = "有位！" + (w.n || "路邊泊車位"); body = "位號 " + w.id + " 由佔用中變空置"; }
     if ("Notification" in window && Notification.permission === "granted") {
       try {
-        var n = new Notification(title, {body:"位號 " + w.id + " 由佔用中變空置", tag:"hkwt-" + w.id});
+        var n = new Notification(title, {body: body, tag: "hkwt-" + (w.street || w.id)});
         n.onclick = function(){ try { window.focus(); } catch(e){} };
       } catch(e){}
     }
-    toast(title + " · 位號 " + w.id);
+    toast(title + " · " + body);
     if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch(e){} }
+  }
+  function wtToggleStreet(s, d){
+    var i = -1;
+    for (var k = 0; k < WT.list.length; k++) {
+      var w = WT.list[k];
+      if (w.s && w.s === s && (w.d || "") === (d || "")) { i = k; break; }
+    }
+    if (i >= 0) { WT.list.splice(i, 1); toast("已取消提醒 · " + s); }
+    else { WT.list.push({s: s, d: d || ""}); wtAsk(); toast("已加入提醒 · " + s + "（整條街有位即通知）"); }
+    wtPersist();
+    if (typeof renderMeters === "function") renderMeters();
   }
   function wtCheck(spaces){
     if (!WT.list.length) return;
-    var map = {}, i;
-    for (i = 0; i < spaces.length; i++) map[String(spaces[i][0])] = Number(spaces[i][3]);
+    var map = {}, meta = {}, i;
+    for (i = 0; i < spaces.length; i++) {
+      var sid = String(spaces[i][0]);
+      map[sid] = Number(spaces[i][3]);
+      meta[sid] = [spaces[i][4] || "（未列街道）", spaces[i][5] || ""];
+    }
     var hits = [];
     WT.list.forEach(function(w){
-      var now = map[w.id], prev = WT.seen[w.id];
-      if (now === undefined) return;
-      if (prev === 1 && now === 0) hits.push(w);
-      WT.seen[w.id] = now;
+      if (w.s) {
+        var n = 0, ids = [];
+        for (var k in map) {
+          if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
+          if (meta[k][0] !== w.s || meta[k][1] !== (w.d || "")) continue;
+          if (WT.seen[k] === 1 && map[k] === 0) { n++; if (ids.length < 4) ids.push(k); }
+          WT.seen[k] = map[k];
+        }
+        if (n) hits.push({street: w.s, cnt: n, ids: ids});
+      } else {
+        var now = map[w.id], prev = WT.seen[w.id];
+        if (now === undefined) return;
+        if (prev === 1 && now === 0) hits.push(w);
+        WT.seen[w.id] = now;
+      }
     });
     wtPersist();
     hits.forEach(function(w, k){ setTimeout(function(){ wtNotice(w); }, k * 600); });
@@ -1561,6 +1640,108 @@ setInterval(loadRadar, 720000);
     });
   }
 
+  /* ---------- 咪錶位：按街道分組的清單 ---------- */
+  var MI = {q:"", dist:"", free:false, shown:24, size:24, open:"", sp:30, cache:null};
+  function meterCache(){
+    if (MI.cache) return MI.cache;
+    var g = {}, arr = ST.meters || [], vac = 0;
+    arr.forEach(function(m){
+      if (Number(m[3]) === 0) vac++;
+      var s = m[4] || "（未列街道）", d = m[5] || "", k = s + "|" + d;
+      var o = g[k] || (g[k] = {k:k, s:s, d:d, n:0, v:0, items:[]});
+      o.n++; if (Number(m[3]) === 0) o.v++;
+      o.items.push(m);
+    });
+    MI.total = arr.length; MI.vac = vac; MI.cache = g; return g;
+  }
+  function wtHasStreet(s, d){
+    for (var i = 0; i < WT.list.length; i++) {
+      var w = WT.list[i];
+      if (w.s && w.s === s && (w.d || "") === (d || "")) return true;
+    }
+    return false;
+  }
+  function metColor(st){ return st === 0 ? "#54d8c4" : st === 1 ? "#ff6b78" : "#3a4757"; }
+  function renderMeters(){
+    var list = document.getElementById("mt-list");
+    if (!list) return;
+    var g = meterCache(), q = MI.q.trim().toLowerCase();
+    var rows = Object.keys(g).map(function(k){ return g[k]; }).filter(function(x){
+      if (MI.dist && x.d !== MI.dist) return false;
+      if (MI.free && x.v === 0) return false;
+      if (q && ((x.s + " " + x.d) || "").toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function(a, b){ return (b.v - a.v) || (b.n - a.n) || (a.s > b.s ? 1 : -1); });
+
+    document.getElementById("mt-sub").textContent =
+      "共 " + (MI.total || 0).toLocaleString() + " 個路邊位、現時空置 " + (MI.vac || 0).toLocaleString()
+      + " 個；資料每 10 分鐘更新";
+    document.getElementById("mt-count").textContent =
+      "符合 " + rows.length + " 條街道" + (MI.q || MI.dist || MI.free ? "" : "，按空置位排序");
+
+    var slice = rows.slice(0, MI.shown);
+    list.innerHTML = slice.map(function(x){
+      var on = wtHasStreet(x.s, x.d);
+      var spaces = x.items.slice().sort(function(a, b){
+        return (Number(b[3]) === 0) - (Number(a[3]) === 0) || String(a[0]) > String(b[0]) ? 1 : -1;
+      });
+      return '<div class="mt-row">'
+        + '<div class="mt-head">'
+        + '<button class="mt-open" data-ms="' + esc(x.k) + '"><b>' + esc(x.s) + '</b>'
+        + '<span>' + esc(x.d) + '</span><em>空置 ' + x.v + ' / ' + x.n + '</em></button>'
+        + '<button class="mt-watch' + (on ? " on" : "") + '" data-ws="' + esc(x.s) + '" data-wd="' + esc(x.d) + '">'
+        + (on ? "★ 已提醒" : "☆ 提醒") + '</button></div>'
+        + (MI.open === x.k
+          ? '<div class="mt-spaces">' + spaces.slice(0, MI.sp).map(function(m){
+              var id = String(m[0]), w = wtHas(id), st = Number(m[3]);
+              return '<button class="mt-sp' + (w ? " on" : "") + '" data-wt="' + esc(id) + '" data-wtn="' + esc(x.s) + '">'
+                + '<i style="background:' + metColor(st) + '"></i>' + esc(id) + '</button>';
+            }).join("")
+            + (spaces.length > MI.sp
+              ? '<button class="mt-sp mt-more-sp" data-msp="1">＋顯示餘下 ' + (spaces.length - MI.sp) + ' 個</button>'
+              : "")
+            + '</div>'
+          : "")
+        + '</div>';
+    }).join("");
+    document.getElementById("mt-more").style.display = slice.length < rows.length ? "block" : "none";
+  }
+  function wireMeterUI(){
+    var ob = document.getElementById("open-meter");
+    if (ob) ob.addEventListener("click", function(){
+      TG.meters = true; setBtn("tg-meters", true); applyToggles();
+      closeSheet("p-cafe"); closeSheet("p-trail");
+      openSheet("p-meter"); renderMeters();
+      try { history.replaceState(null, "", "#meter"); } catch(e){}
+    });
+    document.getElementById("mt-q").addEventListener("input", function(){
+      MI.q = this.value; MI.shown = MI.size; renderMeters();
+    });
+    document.getElementById("mt-dist").addEventListener("change", function(){
+      MI.dist = this.value; MI.shown = MI.size; renderMeters();
+    });
+    document.getElementById("mt-onlyfree").addEventListener("click", function(){
+      MI.free = !MI.free; this.setAttribute("aria-pressed", MI.free); MI.shown = MI.size; renderMeters();
+    });
+    document.getElementById("mt-more").addEventListener("click", function(){
+      MI.shown += MI.size; renderMeters();
+    });
+    document.addEventListener("click", function(e){
+      var m = e.target.closest && e.target.closest("[data-ms]");
+      if (m) {
+        var k = m.getAttribute("data-ms");
+        MI.open = MI.open === k ? "" : k;
+        MI.sp = 30;
+        renderMeters();
+        return;
+      }
+      var mx = e.target.closest && e.target.closest("[data-msp]");
+      if (mx) { MI.sp += 30; renderMeters(); return; }
+      var w = e.target.closest && e.target.closest("[data-ws]");
+      if (w) { wtToggleStreet(w.getAttribute("data-ws"), w.getAttribute("data-wd"), w); }
+    });
+  }
+
   /* ---------- data ---------- */
   function loadData(){
     var bust = "?t=" + Date.now();
@@ -1574,7 +1755,19 @@ setInterval(loadRadar, 720000);
       ST.parks = pk.parks || []; ST.meters = mt.spaces || [];
       ST.cafes = fc.cafes || []; ST.trails = tr.trails || []; ST.posts = tr.posts || [];
       ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
+      MI.cache = null;
+      var mb = document.getElementById("open-meter");
+      if (mb && ST.meters.length) mb.textContent = "咪錶 " + ST.meters.length.toLocaleString() + " 位";
+      var mdist = document.getElementById("mt-dist");
+      if (mdist && mdist.options.length < 2) {
+        var ds = {}, i2;
+        for (i2 = 0; i2 < ST.meters.length; i2++) { var dd = ST.meters[i2][5]; if (dd) ds[dd] = 1; }
+        Object.keys(ds).sort().forEach(function(d){
+          var o = document.createElement("option"); o.value = d; o.textContent = d; mdist.appendChild(o);
+        });
+      }
       wtCheck(ST.meters);
+      if (document.getElementById("p-meter") && document.getElementById("p-meter").classList.contains("on")) renderMeters();
 
       var total = 0, open = 0;
       ST.parks.forEach(function(p){ if (p.v > 0) { total += p.v; open++; } });
@@ -1616,25 +1809,26 @@ setInterval(loadRadar, 720000);
   function go(h){
     if (h === "now") { showTab("tab-now"); return; }
     showTab("tab-map");
-    if (h === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); closeSheet("p-trail"); openSheet("p-cafe"); }
-    else if (h === "trail" || h === "trails") { TG.trails = true; setBtn("tg-trails", true); closeSheet("p-cafe"); openSheet("p-trail"); }
-    else if (h === "park") { TG.parks = true; setBtn("tg-parks", true); closeSheet("p-cafe"); closeSheet("p-trail"); }
-    else { closeSheet("p-cafe"); closeSheet("p-trail"); }
+    if (h === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); closeSheet("p-trail"); closeSheet("p-meter"); openSheet("p-cafe"); }
+    else if (h === "trail" || h === "trails") { TG.trails = true; setBtn("tg-trails", true); closeSheet("p-cafe"); closeSheet("p-meter"); openSheet("p-trail"); }
+    else if (h === "meter") { TG.meters = true; setBtn("tg-meters", true); closeSheet("p-cafe"); closeSheet("p-trail"); openSheet("p-meter"); if (typeof renderMeters === "function") renderMeters(); }
+    else if (h === "park") { TG.parks = true; setBtn("tg-parks", true); closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
+    else { closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
     applyToggles();
     try { history.replaceState(null, "", "#" + h); } catch(e){}
   }
 
   document.addEventListener("DOMContentLoaded", function(){
-    wireSearch(); wireCafeUI(); wireTrailUI(); wtLoad();
+    wireSearch(); wireCafeUI(); wireTrailUI(); wireMeterUI(); wtLoad();
     var h = (location.hash || "").replace("#", "");
-    if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
+    if (["now","map","park","cafe","trail","meter"].indexOf(h) >= 0) go(h);
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
   });
 
   window.addEventListener("hashchange", function(){
     var h = (location.hash || "").replace("#", "");
-    if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
+    if (["now","map","park","cafe","trail","meter"].indexOf(h) >= 0) go(h);
   });
 
   window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck };
