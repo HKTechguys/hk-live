@@ -289,6 +289,25 @@ body{overflow:hidden;height:100vh}
   border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
 .pp-act button:hover,.pp-act a:hover{background:rgba(84,216,196,.2)}
 .pp-act button.ok{background:rgba(84,216,196,.3);color:#eaf6f5}
+/* 路線 App 選擇 */
+.navmask{position:fixed;inset:0;z-index:90;background:rgba(4,7,11,.6);
+  display:flex;align-items:flex-end;justify-content:center}
+.navbox{width:min(440px,100%);background:#111a22;border:1px solid var(--line);
+  border-radius:16px 16px 0 0;padding:14px 14px calc(20px + env(safe-area-inset-bottom,0px));
+  max-height:88vh;overflow:auto;box-shadow:0 -12px 40px rgba(0,0,0,.55)}
+.navhead h4{margin:0;font-size:14px;color:#eaf6f5}
+.navhead .sub{font-size:10.5px;color:var(--dim);margin:3px 0 11px;line-height:1.4}
+.navrow{display:flex;align-items:center;gap:10px;text-decoration:none;color:#dfecef;
+  padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0d151d;margin-bottom:8px}
+.navrow i{font-style:normal;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;background:rgba(84,216,196,.14);color:var(--teal);font-size:12px;font-weight:700;flex:0 0 auto}
+.navrow b{font-size:12.5px;font-weight:600;white-space:nowrap}
+.navrow span{font-size:10.5px;color:var(--dim);margin-left:auto;text-align:right;line-height:1.3}
+.navrow:active{background:#16222c}
+.navfoot{display:flex;gap:8px;margin-top:6px}
+.navmini{flex:1;font:inherit;font-size:11.5px;padding:9px 0;border-radius:9px;
+  border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim);cursor:pointer}
+.navmini.ok{color:var(--teal);border-color:rgba(84,216,196,.45)}
 .maplibregl-ctrl-group{background:#0d131d!important;border:1px solid #1d2836!important}
 .maplibregl-ctrl-group button+button{border-top:1px solid #1d2836!important}
 .maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.85)}
@@ -1061,16 +1080,67 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- 複製地址 / 規劃路線 ---------- */
-  function gmapDir(la, lo){
-    return "https://www.google.com/maps/dir/?api=1&destination=" + Number(la).toFixed(6)
-      + "," + Number(lo).toFixed(6) + "&travelmode=driving";
+  function isIOS(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  function isAndroid(){ return /Android/i.test(navigator.userAgent); }
+  function navApps(la, lo, name){
+    la = Number(la); lo = Number(lo);
+    var q = name ? encodeURIComponent(name) : "";
+    var g = "https://www.google.com/maps/dir/?api=1&destination=" + la.toFixed(6) + "," + lo.toFixed(6) + "&travelmode=driving";
+    var ap = "https://maps.apple.com/?daddr=" + la.toFixed(6) + "," + lo.toFixed(6) + (q ? "&q=" + q : "");
+    var am = "https://uri.amap.com/navigation?to=" + lo.toFixed(6) + "," + la.toFixed(6) + "," + q
+      + "&mode=car&callnative=1&coordinate=gaode";
+    var cm = "https://citymapper.com/directions?endcoord=" + la.toFixed(6) + "," + lo.toFixed(6)
+      + (q ? "&endname=" + q : "");
+    var list = [
+      {l:"Google 地圖", s:"駕車 / 步行 / 公共交通", u:g},
+      {l:"Apple 地圖", s:"iPhone、iPad 內置", u:ap},
+      {l:"高德地圖", s:"內地 / 跨境常用", u:am},
+      {l:"Citymapper", s:"公共交通、轉車建議", u:cm}
+    ];
+    if (isIOS()) list = [list[1], list[0], list[3], list[2]];
+    else if (isAndroid()) list = [list[0], list[2], list[3], list[1]];
+    return list;
+  }
+  var NAVM = null;
+  function closeNav(){
+    if (NAVM && NAVM.parentNode) NAVM.parentNode.removeChild(NAVM);
+    NAVM = null;
+  }
+  function openNav(la, lo, name){
+    closeNav();
+    var apps = navApps(la, lo, name);
+    var wrap = document.createElement("div");
+    wrap.className = "navmask";
+    wrap.innerHTML = '<div class="navbox">'
+      + '<div class="navhead"><h4>用邊個 App 開路線？</h4>'
+      + '<div class="sub">' + esc(name || "目的地") + '</div></div>'
+      + apps.map(function(a){
+          return '<a class="navrow" href="' + a.u + '" target="_blank" rel="noopener">'
+            + '<i>' + a.l.charAt(0) + '</i><b>' + a.l + '</b><span>' + a.s + '</span></a>';
+        }).join("")
+      + '<div class="navfoot">'
+      + '<button class="navmini" data-copy="' + la.toFixed(6) + ", " + lo.toFixed(6) + '">複製坐標</button>'
+      + '<button class="navmini" data-navclose="1">取消</button>'
+      + "</div></div>";
+    document.body.appendChild(wrap);
+    NAVM = wrap;
+    wrap.addEventListener("click", function(e){
+      if (e.target === wrap) { closeNav(); return; }
+      if (e.target.closest && e.target.closest("[data-navclose]")) { closeNav(); return; }
+      if (e.target.closest && e.target.closest("a.navrow")) setTimeout(closeNav, 140);
+    });
   }
   function actBtns(addr, la, lo, label){
     var a = String(addr || "").trim();
     return '<div class="pp-act">'
       + (a ? '<button data-copy="' + esc(a) + '">' + (label || "複製地址") + '</button>' : "")
-      + (la != null && lo != null ? '<a href="' + gmapDir(la, lo) + '" target="_blank" rel="noopener">'
-        + (a ? "規劃路線" : "路線到起點") + ' ↗</a>' : "")
+      + (la != null && lo != null
+        ? '<button data-nav="' + Number(la).toFixed(6) + "," + Number(lo).toFixed(6) + '"'
+          + ' data-nm="' + esc(a) + '">' + (a ? "規劃路線" : "路線到起點") + '</button>'
+        : "")
       + "</div>";
   }
   function copyText(t, btn){
@@ -1093,7 +1163,14 @@ setInterval(loadRadar, 720000);
   }
   document.addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest("[data-copy]");
-    if (!b) return;
+    if (!b) {
+      var n = e.target.closest && e.target.closest("[data-nav]");
+      if (!n) return;
+      e.preventDefault();
+      var v = String(n.getAttribute("data-nav")).split(",");
+      openNav(Number(v[0]), Number(v[1]), n.getAttribute("data-nm") || "");
+      return;
+    }
     e.preventDefault();
     copyText(b.getAttribute("data-copy"), b);
   });
@@ -1303,7 +1380,7 @@ setInterval(loadRadar, 720000);
         + (meta || route ? '<div class="sub2">'+esc([meta, route].filter(Boolean).join(" · "))+'</div>' : "")
         + '<div class="acts"><button data-fly="'+r.i+'">在地圖看</button>'
         + (t.sp ? '<button data-copy="'+esc(t.sp)+'">複製起點</button>' : "")
-        + (trailStart(t) ? '<a href="'+gmapDir(trailStart(t)[0], trailStart(t)[1])+'" target="_blank" rel="noopener">路線到起點</a>' : "")
+        + (trailStart(t) ? '<button data-nav="'+Number(trailStart(t)[0]).toFixed(6)+","+Number(trailStart(t)[1]).toFixed(6)+'" data-nm="'+esc(t.sp||"")+'">路線到起點</button>' : "")
         + '</div>'
         + "</div>";
     }).join("");
@@ -1349,7 +1426,7 @@ setInterval(loadRadar, 720000);
         + '<div class="cf-actions">'
         + '<button data-i="'+esc(c.s)+'">在地圖看</button>'
         + '<button data-copy="'+esc(c.a || c.n)+'">複製地址</button>'
-        + '<a href="'+gmapDir(c.la, c.lo)+'" target="_blank" rel="noopener">路線</a>'
+        + '<button data-nav="'+Number(c.la).toFixed(6)+","+Number(c.lo).toFixed(6)+'" data-nm="'+esc(c.a || c.n)+'">路線</button>'
         + (c.t ? '<a href="tel:'+esc(c.t.replace(/[^+\d]/g,""))+'">'+esc(c.t)+'</a>' : "")
         + '<a href="'+esc(c.u)+'" target="_blank" rel="noopener">原站</a>'
         + "</div></div>";
