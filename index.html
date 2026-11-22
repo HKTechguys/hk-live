@@ -1745,17 +1745,23 @@ setInterval(loadRadar, 720000);
   /* ---------- 咪錶即時（面板開住時直連運輸署 CSV） ---------- */
   var LIVE = {
     url: "https://resource.data.one.gov.hk/td/psiparkingspaces/occupancystatus/occupancystatus.csv",
-    iv: 75000, timer: null, on: false, at: "", ok: null, busy: false
+    timer: null, on: false, at: "", ok: null, busy: false
   };
   function liveTime(){
     var d = new Date(Date.now() + 8 * 3600000);
     return d.toISOString().slice(11, 16);
   }
+  function liveGap(){
+    var c = navigator.connection || {};
+    if (c.saveData || /(^|-)2g$/.test(c.effectiveType || "") || c.effectiveType === "slow-2g") return 300000;
+    return WT.list.length ? 75000 : 180000;
+  }
   function liveSub(){
     var s = "共 " + (MI.total || 0).toLocaleString() + " 個路邊位、現時空置 " + (MI.vac || 0).toLocaleString() + " 個";
     if (LIVE.on) {
+      var gap = liveGap(), lab = gap < 120000 ? Math.round(gap / 1000) + " 秒" : Math.round(gap / 60000) + " 分鐘";
       s += LIVE.ok === false ? "；即時更新暫時失敗，稍後自動重試"
-        : "；直連運輸署即時數據，每 75 秒更新" + (LIVE.at ? "（上次 " + LIVE.at + "）" : "…");
+        : "；直連運輸署即時數據，每 " + lab + "更新" + (LIVE.at ? "（上次 " + LIVE.at + "）" : "…");
     } else {
       s += "；資料每 10 分鐘更新";
     }
@@ -1765,22 +1771,34 @@ setInterval(loadRadar, 720000);
   function liveStart(){
     if (LIVE.on) return;
     LIVE.on = true; liveSub(); livePull();
-    if (!LIVE.timer) LIVE.timer = setInterval(function(){ if (!document.hidden) livePull(); }, LIVE.iv);
   }
   function liveStop(){
     if (!LIVE.on) return;
     LIVE.on = false;
-    if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }
+    if (LIVE.timer) { clearTimeout(LIVE.timer); LIVE.timer = null; }
     liveSub();
+  }
+  function liveNext(){
+    if (!LIVE.on) return;
+    if (LIVE.timer) clearTimeout(LIVE.timer);
+    LIVE.timer = setTimeout(function(){
+      LIVE.timer = null;
+      if (!LIVE.on) return;
+      if (document.hidden) { liveNext(); return; }
+      livePull();
+    }, liveGap());
   }
   function livePull(){
     if (!LIVE.on || LIVE.busy) return;
     LIVE.busy = true;
     fetch(LIVE.url + "?t=" + Date.now(), {cache: "no-store"})
       .then(function(r){ if (!r.ok) throw new Error(r.status); return r.text(); })
-      .then(function(txt){ LIVE.busy = false; LIVE.ok = true; liveApply(txt); })
-      .catch(function(){ LIVE.busy = false; LIVE.ok = false; liveSub(); });
+      .then(function(txt){ LIVE.busy = false; LIVE.ok = true; liveApply(txt); liveNext(); })
+      .catch(function(){ LIVE.busy = false; LIVE.ok = false; liveSub(); liveNext(); });
   }
+  document.addEventListener("visibilitychange", function(){
+    if (LIVE.on && !document.hidden) livePull();
+  });
   function liveApply(txt){
     var lines = txt.split("\n"), st = {}, i, n = 0, j, seenVac = 0;
     for (i = 1; i < lines.length; i++) {
