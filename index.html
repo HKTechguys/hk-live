@@ -183,6 +183,20 @@ body{overflow:hidden;height:100vh}
   padding:7px 11px;cursor:pointer;white-space:nowrap}
 .hk-alert .x{font:inherit;font-size:14px;color:#8fa3ad;background:none;border:0;cursor:pointer;padding:2px 4px}
 @keyframes hkIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%)}}
+/* 加到主畫面提示（左下，可關） */
+.hk-install{position:fixed;left:10px;bottom:calc(118px + env(safe-area-inset-bottom));z-index:120;
+  display:flex;align-items:center;gap:9px;max-width:min(330px,calc(100vw - 20px));
+  background:#111a22;border:1px solid rgba(84,216,196,.45);border-radius:12px;padding:9px 11px;
+  box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.hk-install[hidden]{display:none}
+.hk-install .tx{flex:1;min-width:0}
+.hk-install .tx b{display:block;font-size:12.5px;color:var(--teal)}
+.hk-install .tx span{display:block;font-size:10.5px;color:var(--dim);line-height:1.45;margin-top:2px}
+.hk-install .go{font:inherit;font-size:11.5px;color:#0b1016;background:var(--teal);border:0;border-radius:8px;
+  padding:7px 10px;cursor:pointer;white-space:nowrap;touch-action:manipulation}
+.hk-install .x{font:inherit;font-size:13px;color:var(--dim);background:none;border:0;cursor:pointer;padding:2px 4px}
+.hk-install .go[hidden]{display:none}
+body.sheet-on .hk-install{display:none}
 .pp-act button.on{border-color:#ffd166;background:rgba(255,209,102,.12);color:#ffd166}
 .pk-tools button{
   font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
@@ -207,12 +221,10 @@ body{overflow:hidden;height:100vh}
 }
 .pk-tools button#tg-cafes[aria-pressed="true"]::before{background:var(--teal)}
 /* 車輛種類 chips（任何車輛／貨車／旅遊巴） */
-.mt-vt{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch;
-  scrollbar-width:none;touch-action:manipulation}
-.mt-vt::-webkit-scrollbar{display:none}
-.mt-vtbtn{flex:none;font:inherit;font-size:11px;color:var(--dim);background:rgba(13,19,29,.9);
+.mt-vt{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0 2px;touch-action:manipulation}
+.mt-vtbtn{font:inherit;font-size:11px;color:var(--dim);background:rgba(13,19,29,.9);
   border:1px solid var(--line);border-radius:999px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;
-  cursor:pointer;white-space:nowrap;touch-action:manipulation}
+  justify-content:space-between;cursor:pointer;touch-action:manipulation}
 .mt-vtbtn em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink);font-size:11px}
 .mt-vtbtn.on{color:var(--teal);border-color:rgba(84,216,196,.5);background:rgba(84,216,196,.12)}
 .mt-vtbtn.on em{color:var(--teal)}
@@ -911,6 +923,12 @@ setInterval(loadRadar, 720000);
     <s style="background:#3a4757"></s>今次無讀數<br>
     <span class="ce"></span>Cafe 咖啡店（可切換）<br>
     <span style="color:#8fa3ad">咪錶位需 zoom ≥ 13 才顯示</span>
+  </div>
+
+  <div class="hk-install" id="hk-install" hidden>
+    <div class="tx"><b>加到主畫面</b><span id="hk-install-sub">一撳即開，唔使下載</span></div>
+    <button class="go" id="hk-install-go">安裝</button>
+    <button class="x" id="hk-install-x" aria-label="唔裝，關閉提示">✕</button>
   </div>
 </section>
 
@@ -2257,6 +2275,60 @@ setInterval(loadRadar, 720000);
 
   window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck, LIVE: LIVE, livePull: livePull, liveApply: liveApply };
 
+  /* 加到主畫面：自己出提示（Chrome 唔一定自動彈），撳 ✕ 就唔再出 */
+  var IE = null, INSTALL_OFF = "hk_install_off";
+  function standalone(){ return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
+  function installHint(){
+    var sub = document.getElementById("hk-install-sub"), go = document.getElementById("hk-install-go");
+    if (!sub || !go) return;
+    if (IE) { sub.textContent = "一撳即開，唔使下載"; go.hidden = false; return; }
+    go.hidden = true;
+    sub.textContent = /iphone|ipad|ipod/i.test(navigator.userAgent)
+      ? "撳下面分享 ⤴ 再揀「加入主畫面」" : "瀏覽器選單 →「安裝應用程式」";
+  }
+  function placeInstall(){
+    var el = document.getElementById("hk-install");
+    if (!el || el.hidden) return;
+    var t = document.querySelector(".pk-tools"), b = 118;
+    if (t) {
+      var r = t.getBoundingClientRect();
+      if (r.height && r.top > 0) b = window.innerHeight - r.top + 8;
+    }
+    el.style.bottom = Math.round(b) + "px";
+  }
+  function showInstall(){
+    var el = document.getElementById("hk-install");
+    if (!el || standalone()) return;
+    var off = 0;
+    try { off = parseInt(localStorage.getItem(INSTALL_OFF) || "0", 10); } catch(e){}
+    if (off && Date.now() - off < 14 * 864e5) return;   // 撳過 ✕ 就 14 日唔再煩
+    installHint(); el.hidden = false; placeInstall();
+  }
+  window.addEventListener("resize", placeInstall);
+  window.addEventListener("orientationchange", function(){ setTimeout(placeInstall, 250); });
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault(); IE = e; installHint(); showInstall();
+  });
+  window.addEventListener("appinstalled", function(){
+    var el = document.getElementById("hk-install"); if (el) el.hidden = true;
+    try { localStorage.setItem(INSTALL_OFF, String(Date.now())); } catch(e){}
+  });
+  document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(showInstall, 1200);
+    var x = document.getElementById("hk-install-x"), go = document.getElementById("hk-install-go");
+    if (x) x.addEventListener("click", function(){
+      document.getElementById("hk-install").hidden = true;
+      try { localStorage.setItem(INSTALL_OFF, String(Date.now())); } catch(e){}
+    });
+    if (go) go.addEventListener("click", function(){
+      if (!IE) { installHint(); return; }
+      IE.prompt();
+      IE.userChoice.then(function(r){
+        if (r && r.outcome === "accepted") { document.getElementById("hk-install").hidden = true; }
+        IE = null; installHint();
+      });
+    });
+  });
   /* 加到主畫面：SW 只為安裝資格，不快取任何嘢 */
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register("sw.js").catch(function(){});
