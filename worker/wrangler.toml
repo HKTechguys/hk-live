@@ -1,0 +1,16 @@
+name = "hk-live-push"
+main = "index.js"
+compatibility_date = "2026-11-20"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+[[kv_namespaces]]
+binding = "PUSH_KV"
+id = "75abaa0bb3104488aee4125604971b82"
+
+[vars]
+VAPID_PUBLIC = "BFbmewABPMJeUHv7xBwMWgmQE1Kv1narvc1Ad6jV3xu9AZ-PAJ7nrECe97BvsWpogQbx6sAE39eaeS2ZtoMVv-A"
+VAPID_SUBJECT = "mailto:hk-live@example.com"
+
+# 私鑰唔好寫落檔案，用：npx wrangler secret put VAPID_PRIVATE
