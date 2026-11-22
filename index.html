@@ -892,7 +892,7 @@ setInterval(loadRadar, 720000);
   <div class="pk-hud">
     <div class="pk-chip"><i>停車場總空位</i><b class="g" id="s-vac">—</b></div>
     <div class="pk-chip"><i>有空位車場</i><b class="y" id="s-open">—</b></div>
-    <div class="pk-chip"><i>路邊感應位剩餘</i><b class="g" id="s-meter">—</b></div>
+    <div class="pk-chip"><i id="s-meter-lb">私家車位剩餘</i><b class="g" id="s-meter">—</b></div>
     <div class="pk-chip"><i>停車場更新時間</i><b id="s-time" style="font-size:12px;font-weight:500">載入中…</b></div>
   </div>
 
@@ -981,7 +981,8 @@ setInterval(loadRadar, 720000);
     <div class="cf-note">
       按街道分組，預設按「現在空置位」多寡排序，撳街名可展開該街每個位。<br>
       「☆ 提醒」可設整條街、整個地區或單一位；狀態由佔用中變空置即通知。<br>
-      面板開着時直連運輸署即時數據（有提醒 75 秒、其他 3 分鐘）；收起後靠每 10 分鐘更新的資料。
+      面板開着時直連運輸署即時數據（有提醒 75 秒、其他 3 分鐘）；收起後靠每 10 分鐘更新的資料。<br>
+      預設只顯示<b>私家車</b>位（運輸署「任何車輛 A」）；貨車位、旅遊巴位私家車不可泊，要用時先撳上面嘅種類。
     </div>
   </div>
 </section>
@@ -1671,6 +1672,7 @@ setInterval(loadRadar, 720000);
     vis("post-dot", TG.trails && TG.posts);
     var f = TG.free ? [">=",["get","v"],3] : null;
     map.setFilter("park-icon", f); map.setFilter("park-halo", f);
+    if (map.getLayer("meter-dot") && MI) map.setFilter("meter-dot", meterFilter());
   }
   [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],
    ["tg-trails","trails"],["tg-posts","posts"],["tg-free","free"]].forEach(function(pair){
@@ -1872,9 +1874,34 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- 咪錶位：按街道分組的清單 ---------- */
-  var MI = {q:"", dist:"", free:false, shown:24, size:24, open:"", sp:30, cache:null, vt:""};
-  var VTL = {A:"任何車輛", G:"貨車", C:"旅遊巴"};
+  var MI = {q:"", dist:"", free:false, shown:24, size:24, open:"", sp:30, cache:null,
+    vt: (function(){ try { return localStorage.getItem("hk_mt_vt") || "A"; } catch(e){ return "A"; } })()};
+  var VTL = {A:"私家車（任何車輛）", G:"貨車", C:"旅遊巴"};
   function vtLabel(v){ return VTL[v] || "未標示"; }
+  function vtOk(m){
+    if (!MI.vt) return true;
+    if (MI.vt === "#") return !VTL[m[6]];
+    return m[6] === MI.vt;
+  }
+  function meterFilter(){
+    if (!MI.vt) return null;
+    if (MI.vt === "#") return ["match",["get","vt"],"A",false,"G",false,"C",false,true];
+    return ["match",["get","vt"], MI.vt, true, false];
+  }
+  function hudMeter(){
+    var v = 0, n = 0;
+    (ST.meters || []).forEach(function(m){
+      if (!vtOk(m)) return;
+      n++;
+      if (Number(m[3]) === 0) v++;
+    });
+    var sm = document.getElementById("s-meter"); if (sm) sm.textContent = num(v);
+    var lb = document.getElementById("s-meter-lb");
+    if (lb) lb.textContent = MI.vt === "A" ? "私家車位剩餘" : "路邊感應位剩餘";
+    var ob = document.getElementById("open-meter");
+    if (ob && n) ob.textContent = "咪錶 " + num(n) + " 位";
+    return v;
+  }
   function renderVtChips(){
     var el = document.getElementById("mt-vt");
     if (!el) return;
@@ -1882,7 +1909,7 @@ setInterval(loadRadar, 720000);
     arr.forEach(function(m){
       if (m[6] === "A") c.A++; else if (m[6] === "G") c.G++; else if (m[6] === "C") c.C++; else c.x++;
     });
-    var opts = [["", "全部", c.all], ["A", "任何車輛", c.A], ["G", "貨車", c.G], ["C", "旅遊巴", c.C]];
+    var opts = [["A", "私家車", c.A], ["G", "貨車", c.G], ["C", "旅遊巴", c.C], ["", "全部", c.all]];
     if (c.x) opts.push(["#", "未標示", c.x]);
     el.innerHTML = opts.map(function(o){
       var on = MI.vt === o[0];
@@ -1892,12 +1919,7 @@ setInterval(loadRadar, 720000);
   }
   function meterCache(){
     if (MI.cache) return MI.cache;
-    var g = {}, arr = ST.meters || [], vac = 0;
-    if (MI.vt) {
-      arr = arr.filter(function(m){
-        return MI.vt === "#" ? !VTL[m[6]] : m[6] === MI.vt;
-      });
-    }
+    var g = {}, arr = (ST.meters || []).filter(vtOk), vac = 0;
     arr.forEach(function(m){
       if (Number(m[3]) === 0) vac++;
       var s = m[4] || "（未列街道）", d = m[5] || "", k = s + "|" + d;
@@ -2048,7 +2070,9 @@ setInterval(loadRadar, 720000);
       var vt = e.target.closest && e.target.closest("[data-mvt]");
       if (vt) {
         MI.vt = vt.getAttribute("data-mvt");
+        try { localStorage.setItem("hk_mt_vt", MI.vt); } catch(err){}
         MI.cache = null; MI.open = ""; MI.shown = MI.size;
+        applyToggles(); hudMeter();
         renderMeters();
         return;
       }
@@ -2174,7 +2198,7 @@ setInterval(loadRadar, 720000);
     ST.live = {at: LIVE.at, rows: n, vacant: seenVac};
     if (ST.mm) ST.mm.last_update = "即時 " + LIVE.at;
     var sm = document.getElementById("s-meter");
-    if (sm) sm.textContent = num(seenVac);
+    if (sm) hudMeter();
     if (ST.map && arr.length) {
       var src = ST.map.getSource("meters");
       if (src) src.setData(metersFC());
@@ -2217,6 +2241,7 @@ setInterval(loadRadar, 720000);
       document.getElementById("s-open").textContent = open + " / " + ST.parks.length;
       document.getElementById("s-meter").textContent = num(mt.vacant || 0);
       document.getElementById("s-time").textContent = pk.last_update || pk.generated;
+      hudMeter();
 
       var districts = {};
       ST.cafes.forEach(function(c){ if (c.d) districts[c.d] = (districts[c.d]||0)+1; });
