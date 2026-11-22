@@ -93,8 +93,168 @@
     object-fit:cover; object-position:left center}
   body[data-lv="2"] .holiday .days .n,body[data-lv="3"] .holiday .days .n{color:var(--ink)}
 </style>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+/* ===== 整合 tab 層：沿用原站 teal/dark 主題 ===== */
+:root{
+  --tabh:52px;
+  --free:#54d8c4; --low:#ffd166; --mid:#ff9f43; --full:#ff6b78; --none:#3a4757;
+}
+body{overflow:hidden;height:100vh}
+.tabbar{
+  position:fixed;top:0;left:0;right:0;height:var(--tabh);z-index:40;
+  display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap;
+  background:rgba(9,15,21,.92);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+  padding:0 10px;
+}
+.tabbar button{
+  font:inherit;font-size:13px;letter-spacing:.02em;
+  color:var(--dim);background:transparent;border:1px solid transparent;
+  border-radius:999px;padding:7px 14px;cursor:pointer;white-space:nowrap;
+}
+.tabbar button[aria-selected="true"]{
+  color:var(--teal);border-color:rgba(84,216,196,.45);background:rgba(84,216,196,.10);
+}
+.tabbar .sp{flex:1}
+.tabbar .live{font-size:10.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+
+.tabpage{display:none}
+.tabpage.on{display:block}
+#p-now{padding-top:var(--tabh);height:100vh;overflow-y:auto;overflow-x:hidden}
+#p-now .wind{position:fixed}
+#p-now .wrap{margin-top:0}
+
+/* ---------- 泊車 tab ---------- */
+#p-park{padding-top:var(--tabh);height:100vh;position:relative;background:#070a10}
+#map{position:absolute;top:var(--tabh);left:0;right:0;bottom:0}
+.pk-hud{
+  position:absolute;top:calc(var(--tabh) + 10px);left:10px;z-index:20;
+  display:flex;gap:7px;flex-wrap:wrap;max-width:calc(100% - 20px);
+}
+.pk-chip{
+  background:rgba(13,19,29,.9);border:1px solid var(--line);border-radius:10px;
+  padding:5px 10px;font-size:11px;line-height:1.5;backdrop-filter:blur(8px);
+}
+.pk-chip i{display:block;font-style:normal;font-size:9.5px;color:var(--dim);letter-spacing:.06em}
+.pk-chip b{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pk-chip b.g{color:var(--free)} .pk-chip b.y{color:var(--low)}
+.pk-tools{
+  position:absolute;bottom:14px;left:10px;z-index:20;display:flex;gap:6px;flex-wrap:wrap;
+  max-width:calc(100% - 20px);
+}
+.pk-tools button{
+  font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
+  border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer;
+}
+.pk-tools button[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45)}
+.pk-legend{
+  position:absolute;bottom:14px;right:10px;z-index:20;
+  background:rgba(13,19,29,.92);border:1px solid var(--line);border-radius:10px;
+  padding:8px 10px;font-size:10.5px;color:var(--dim);line-height:1.7;
+}
+.pk-legend s{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;text-decoration:none}
+.pk-legend .h{color:var(--ink);font-size:11px;display:block;margin-bottom:3px}
+
+/* 搜尋列（泊車 tab） */
+.pk-search{
+  position:absolute;top:calc(var(--tabh) + 10px);right:10px;z-index:21;width:min(320px,60vw);
+}
+.pk-search input{
+  width:100%;padding:8px 12px;border-radius:10px;border:1px solid var(--line);
+  background:rgba(13,19,29,.92);color:var(--ink);font:inherit;font-size:12.5px;
+  backdrop-filter:blur(8px);
+}
+.pk-results{display:flex;flex-direction:column;gap:4px;margin-top:5px;max-height:42vh;overflow:auto}
+.pk-hit{
+  background:rgba(13,19,29,.95);border:1px solid var(--line);border-radius:8px;
+  padding:7px 9px;font-size:11.5px;cursor:pointer;line-height:1.4;
+}
+.pk-hit b{display:block;font-size:12px}
+.pk-hit span{color:var(--dim);font-size:10px}
+
+/* ---------- Cafe tab ---------- */
+#p-cafe{padding-top:var(--tabh);height:100vh;overflow-y:auto;overflow-x:hidden}
+.cf-wrap{max-width:640px;margin:0 auto;padding:16px 16px 40px}
+.cf-top{margin-bottom:12px}
+.cf-top h2{font-size:17px;margin:0 0 4px;letter-spacing:.02em}
+.cf-top p{font-size:11.5px;color:var(--dim);margin:0;line-height:1.6}
+.cf-search{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+.cf-search input,.cf-search select{
+  font:inherit;font-size:12.5px;padding:8px 11px;border-radius:9px;
+  border:1px solid var(--line);background:#111a22;color:var(--ink);
+}
+.cf-search input{flex:1;min-width:150px}
+.cf-count{font-size:11px;color:var(--dim);margin:6px 0 10px}
+.cf-list{display:flex;flex-direction:column;gap:9px}
+.cf-card{
+  background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:12px 13px;
+}
+.cf-head{display:flex;align-items:flex-start;gap:9px}
+.cf-mono{
+  width:34px;height:34px;border-radius:9px;flex:none;
+  background:rgba(84,216,196,.12);border:1px solid rgba(84,216,196,.28);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:600;color:var(--teal);letter-spacing:.02em;
+}
+.cf-head .t{flex:1;min-width:0}
+.cf-head h3{margin:0;font-size:14px;line-height:1.35}
+.cf-head .sub{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.cf-hours{font-size:11.5px;color:var(--teal);margin-top:7px;line-height:1.5}
+.cf-x{font-size:11.5px;color:#b9c7cb;line-height:1.6;margin-top:7px}
+.cf-actions{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+.cf-actions button,.cf-actions a{
+  font:inherit;font-size:11px;text-decoration:none;
+  border:1px solid rgba(84,216,196,.4);background:rgba(84,216,196,.08);color:var(--teal);
+  border-radius:8px;padding:5px 10px;cursor:pointer;
+}
+.cf-actions a{border-color:var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
+.cf-more{display:block;margin:14px auto 0;font:inherit;font-size:12px;padding:9px 18px;
+  border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--dim);cursor:pointer}
+.cf-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
+  border-top:1px dashed var(--line);padding-top:10px}
+
+/* ---------- popup ---------- */
+.maplibregl-popup-content{
+  background:#0d131d;color:#eaf6f5;border:1px solid #1d2836;border-radius:11px;
+  padding:11px 13px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.55);
+  font-family:"PingFang HK","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+}
+.maplibregl-popup-tip{border-top-color:#0d131d!important;border-bottom-color:#0d131d!important}
+.pp h4{margin:0 0 3px;font-size:13.5px;color:#eaf6f5}
+.pp .sub{color:#8fa3ad;font-size:10.5px;margin-bottom:8px;line-height:1.4}
+.pp .row{display:flex;justify-content:space-between;gap:14px;padding:3px 0;border-top:1px dashed #1b2634}
+.pp .row span{color:#8fa3ad}
+.pp .big{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10.5px;margin-top:8px}
+.maplibregl-ctrl-group{background:#0d131d!important;border:1px solid #1d2836!important}
+.maplibregl-ctrl-group button+button{border-top:1px solid #1d2836!important}
+.maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.85)}
+.maplibregl-ctrl-attrib{background:rgba(7,10,16,.8)!important;font-size:10px!important}
+.maplibregl-ctrl-attrib a{color:#8fa3ad!important}
+.maplibregl-ctrl-top-left{top:calc(var(--tabh) + 66px);left:10px}
+
+@media (max-width:520px){
+  .tabbar button{font-size:12.5px;padding:6px 11px}
+  .tabbar .live{display:none}
+  .pk-search{width:calc(100% - 20px);right:10px;top:calc(var(--tabh) + 56px)}
+  .pk-legend{display:none}
+  .pk-hud .pk-chip:nth-child(4){display:none}
+}
+
+</style>
 </head>
 <body>
+<nav class="tabbar" role="tablist" aria-label="頁面分頁">
+  <button role="tab" id="tab-now" aria-selected="true" aria-controls="p-now">即時</button>
+  <button role="tab" id="tab-park" aria-selected="false" aria-controls="p-park">泊車</button>
+  <button role="tab" id="tab-cafe" aria-selected="false" aria-controls="p-cafe">Cafe</button>
+  <span class="sp"></span>
+  <span class="live" id="tab-live"></span>
+</nav>
+
+<section class="tabpage on" id="p-now" role="tabpanel" aria-labelledby="tab-now">
 <div class="wind"></div>
 <div class="wrap">
   <div class="banner" id="banner"></div>
@@ -147,6 +307,8 @@
     離線時顯示上一次讀到嘅數值。
   </div>
 </div>
+
+</section>
 
 <script>
 const HOL = [{"d": "2026-12-25", "n": "聖誕節"}, {"d": "2026-12-26", "n": "聖誕節後第一個周日"}, {"d": "2027-01-01", "n": "一月一日"}, {"d": "2027-02-06", "n": "農曆年初一"}, {"d": "2027-02-08", "n": "農曆年初三"}, {"d": "2027-02-09", "n": "農曆年初四"}, {"d": "2027-03-26", "n": "耶穌受難節"}, {"d": "2027-03-27", "n": "耶穌受難節翌日"}, {"d": "2027-03-29", "n": "復活節星期一"}, {"d": "2027-04-05", "n": "清明節"}, {"d": "2027-05-01", "n": "勞動節"}, {"d": "2027-05-13", "n": "佛誕"}, {"d": "2027-06-09", "n": "端午節"}, {"d": "2027-07-01", "n": "香港特別行政區成立紀念日"}, {"d": "2027-09-16", "n": "中秋節翌日"}, {"d": "2027-10-01", "n": "國慶日"}, {"d": "2027-10-08", "n": "重陽節"}, {"d": "2027-12-25", "n": "聖誕節"}, {"d": "2027-12-27", "n": "聖誕節後第一個周日"}];
@@ -498,5 +660,443 @@ loadRadar();
 setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
 setInterval(loadRadar, 720000);
 </script>
+<section class="tabpage" id="p-park" role="tabpanel" aria-labelledby="tab-park">
+  <div id="map"></div>
+
+  <div class="pk-hud">
+    <div class="pk-chip"><i>停車場總空位</i><b class="g" id="s-vac">—</b></div>
+    <div class="pk-chip"><i>有空位車場</i><b class="y" id="s-open">—</b></div>
+    <div class="pk-chip"><i>路邊感應位剩餘</i><b class="g" id="s-meter">—</b></div>
+    <div class="pk-chip"><i>更新</i><b id="s-time" style="font-size:12px;font-weight:500">載入中…</b></div>
+  </div>
+
+  <div class="pk-search">
+    <input id="q" type="search" placeholder="車場／街道／地區，例如 中環">
+    <div class="pk-results" id="results"></div>
+  </div>
+
+  <div class="pk-tools">
+    <button id="tg-parks" aria-pressed="true">停車場</button>
+    <button id="tg-meters" aria-pressed="true">感應咪錶位</button>
+    <button id="tg-cafes" aria-pressed="false">Cafe</button>
+    <button id="tg-free" aria-pressed="false">只看有空位</button>
+  </div>
+
+  <div class="pk-legend">
+    <span class="h">圖例</span>
+    <s style="background:#54d8c4"></s>空位充足（≥20）<br>
+    <s style="background:#ffd166"></s>緊張（5–19）<br>
+    <s style="background:#ff9f43"></s>瀕滿（1–4）<br>
+    <s style="background:#ff6b78"></s>已滿（0）<br>
+    <s style="background:#3a4757"></s>今次無讀數<br>
+    <s style="background:#c58cff"></s>Cafe（可切換）<br>
+    <span style="color:#8fa3ad">咪錶位需 zoom ≥ 13 才顯示</span>
+  </div>
+</section>
+
+<section class="tabpage" id="p-cafe" role="tabpanel" aria-labelledby="tab-cafe">
+  <div class="cf-wrap">
+    <div class="cf-top">
+      <h2>香港手沖咖啡地圖</h2>
+      <p id="cf-sub">載入中…</p>
+    </div>
+    <div class="cf-search">
+      <input id="cf-q" type="search" placeholder="店名／街道／地區">
+      <select id="cf-dist"><option value="">全部地區</option></select>
+    </div>
+    <div class="cf-count" id="cf-count"></div>
+    <div class="cf-list" id="cf-list"></div>
+    <button class="cf-more" id="cf-more">顯示更多</button>
+    <div class="cf-note">
+      資料為事實欄位（店名／地址／座標／營業時間）＋原文節錄 1–2 句，每張卡連回原站。
+      <b>不含照片、不含店舖標誌</b>。營業時間以店舖公布為準，出發前請再確認。
+    </div>
+  </div>
+</section>
+<script src="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+/* ===== 整合 tab / 泊車地圖 / Cafe 清單 ===== */
+(function(){
+  "use strict";
+
+  var ST = { parks:[], meters:[], cafes:[], pm:{}, mm:{}, cm:{}, map:null, booted:false };
+  var esc = function(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  };
+  var valColor = function(v){
+    if (v < 0) return "#3a4757";
+    if (v >= 20) return "#54d8c4";
+    if (v >= 5) return "#ffd166";
+    if (v >= 1) return "#ff9f43";
+    return "#ff6b78";
+  };
+  var parkColorExpr = ["case", ["<", ["get","v"], 0], "#3a4757",
+      ["step", ["get","v"], "#ff6b78", 1, "#ff9f43", 5, "#ffd166", 20, "#54d8c4"]];
+  var num = function(n){ return Number(n).toLocaleString(); };
+
+  /* ---------- tabs ---------- */
+  var TABS = [["tab-now","p-now"],["tab-park","p-park"],["tab-cafe","p-cafe"]];
+  function showTab(key){
+    TABS.forEach(function(t){
+      var btn = document.getElementById(t[0]);
+      var page = document.getElementById(t[1]);
+      var on = (t[0] === key);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+      page.classList.toggle("on", on);
+    });
+    if (key === "tab-park") {
+      bootMap();
+      setTimeout(function(){ if (ST.map) ST.map.resize(); }, 60);
+    }
+    try { history.replaceState(null, "", "#" + key.replace("tab-","")); } catch(e){}
+  }
+  TABS.forEach(function(t){
+    document.getElementById(t[0]).addEventListener("click", function(){ showTab(t[0]); });
+  });
+  var hash = (location.hash || "").replace("#","");
+  /* hash 導向延後到 DOMContentLoaded 執行，確保 MAP_STYLE 已初始化 */
+
+  /* ---------- map ---------- */
+  var MAP_STYLE = {
+    version: 8,
+    sources: {
+      base: {
+        type: "raster",
+        tiles: [
+          "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: "© OpenStreetMap contributors"
+      }
+    },
+    layers: [
+      {id:"bg", type:"background", paint:{"background-color":"#070a10"}},
+      {id:"base", type:"raster", source:"base", paint:{
+        "raster-opacity":0.85, "raster-saturation":-0.66,
+        "raster-brightness-min":0.02, "raster-brightness-max":0.44, "raster-contrast":-0.05
+      }}
+    ]
+  };
+
+  function bootMap(){
+    if (ST.booted || !window.maplibregl) return;
+    ST.booted = true;
+    var map = new maplibregl.Map({
+      container: "map",
+      style: MAP_STYLE,
+      center: [114.168, 22.336], zoom: 10.8, minZoom: 9, maxZoom: 18,
+      attributionControl: false
+    });
+    map.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-left");
+    map.addControl(new maplibregl.GeolocateControl({trackUserLocation:false}), "top-left");
+    map.addControl(new maplibregl.AttributionControl({compact:true}), "bottom-left");
+    map.on("style.load", function(){ drawLayers(map); });
+    map.on("load", function(){ drawLayers(map); });
+    ST.map = map;
+  }
+
+  function drawLayers(map){
+    if (map.getSource("parks")) { syncLayers(map); return; }
+    if (!map.isStyleLoaded()) {
+      if (map.__drawPending) return;
+      map.__drawPending = true;
+      setTimeout(function(){ map.__drawPending = false; drawLayers(map); }, 200);
+      return;
+    }
+
+    map.addSource("parks", {type:"geojson", data: parksFC()});
+    map.addLayer({
+      id:"park-halo", type:"circle", source:"parks",
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],10,["step",["get","v"],7,1,9,5,12,20,15],16,["step",["get","v"],12,1,16,5,21,20,26]],
+        "circle-color":parkColorExpr, "circle-opacity":.16, "circle-blur":1
+      }
+    });
+    map.addLayer({
+      id:"park-dot", type:"circle", source:"parks",
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],10,3.4,16,7.4],
+        "circle-color":parkColorExpr,
+        "circle-stroke-width":1.1, "circle-stroke-color":"rgba(7,10,16,.85)"
+      }
+    });
+    map.addSource("meters", {type:"geojson", data: metersFC()});
+    map.addLayer({
+      id:"meter-dot", type:"circle", source:"meters", minzoom:13,
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],13,2.2,17,5.2],
+        "circle-color":["match",["get","st"],1,"#ff6b78",0,"#54d8c4","#3a4757"],
+        "circle-stroke-width":.7,"circle-stroke-color":"rgba(7,10,16,.9)"
+      }
+    }, "park-halo");
+
+    map.addSource("cafes", {type:"geojson", data: cafesFC()});
+    map.addLayer({
+      id:"cafe-dot", type:"circle", source:"cafes", minzoom:11,
+      layout:{"visibility":"none"},
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],11,3,16,6],
+        "circle-color":"#c58cff",
+        "circle-stroke-width":1,"circle-stroke-color":"rgba(7,10,16,.9)"
+      }
+    });
+
+    map.on("click","park-dot", function(e){ parkPopup(e); });
+    map.on("click","meter-dot", function(e){ meterPopup(e); });
+    map.on("click","cafe-dot", function(e){ cafePopup(e, map); });
+    ["park-dot","meter-dot","cafe-dot"].forEach(function(id){
+      map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
+    });
+
+    /* 若資料比地圖樣式更早到，補回一次資料注入 */
+    syncLayers(map);
+  }
+
+  function syncLayers(map){
+    if (!map || !map.getSource("parks")) return;
+    if (ST.parks.length) map.getSource("parks").setData(parksFC());
+    if (ST.meters.length) map.getSource("meters").setData(metersFC());
+    if (ST.cafes.length) map.getSource("cafes").setData(cafesFC());
+    applyToggles();
+  }
+
+  function parksFC(){
+    return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
+        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h}};
+    })};
+  }
+  function metersFC(){
+    return {type:"FeatureCollection", features:(ST.meters||[]).map(function(m){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[m[2],m[1]]},
+        properties:{id:m[0], st:m[3], s:m[4], d:m[5]}};
+    })};
+  }
+  function cafesFC(){
+    return {type:"FeatureCollection", features:(ST.cafes||[]).map(function(c){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[c.lo,c.la]},
+        properties:{n:c.n, a:c.a, d:c.d, h:c.h, x:c.x, u:c.u, t:c.t}};
+    })};
+  }
+
+  function parkPopup(e){
+    var map = ST.map, p = e.features[0].properties;
+    var lnglat = e.features[0].geometry.coordinates;
+    var v = Number(p.v);
+    var tag = v < 0 ? "今次無實時讀數" : v > 0 ? "有空位" : "已滿";
+    new maplibregl.Popup({maxWidth:"300px"})
+      .setLngLat(lnglat)
+      .setHTML('<div class="pp"><h4>'+esc(p.n)+'</h4>'
+        + '<div class="sub">'+esc(p.d)+(p.a ? " · "+esc(p.a) : "")+'</div>'
+        + '<div class="row"><span>私家車空位</span><span class="big" style="color:'+valColor(v)+'">'
+        + (v < 0 ? "—" : v)+'</span></div>'
+        + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
+        + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
+        + '<div class="row"><span>更新</span><span>'+esc(ST.pm.last_update||"")+'</span></div>'
+        + '<span class="tag" style="background:rgba(84,216,196,.12);color:'+valColor(v)+'">'+tag+'</span></div>')
+      .addTo(map);
+    map.easeTo({center:lnglat, zoom:Math.max(map.getZoom(),14.2), duration:450});
+  }
+
+  function meterPopup(e){
+    var q = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
+    var st = Number(q.st);
+    new maplibregl.Popup({maxWidth:"270px"}).setLngLat(lnglat)
+      .setHTML('<div class="pp"><h4>'+esc(q.s||"路邊泊車位")+'</h4>'
+        + '<div class="sub">'+esc(q.d||"")+' · 位號 '+esc(q.id)+'</div>'
+        + '<div class="row"><span>狀態</span><span style="color:'+(st===1?"#ff6b78":st===0?"#54d8c4":"#8fa3ad")+'">'
+        + (st===1?"佔用中":st===0?"空置":"暫無讀數")+'</span></div>'
+        + '<div class="row"><span>更新</span><span>'+esc(ST.mm.last_update||"")+'</span></div></div>')
+      .addTo(ST.map);
+  }
+
+  function cafePopup(e, map){
+    var c = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
+    new maplibregl.Popup({maxWidth:"310px"}).setLngLat(lnglat)
+      .setHTML('<div class="pp"><h4>'+esc(c.n)+'</h4>'
+        + '<div class="sub">'+esc(c.d||"")+(c.a ? " · "+esc(c.a) : "")+'</div>'
+        + (c.h ? '<div class="row"><span>營業時間</span><span>'+esc(c.h)+'</span></div>' : "")
+        + (c.t ? '<div class="row"><span>電話</span><span>'+esc(c.t)+'</span></div>' : "")
+        + '<div class="x" style="margin-top:8px;color:#b9c7cb;font-size:11.5px;line-height:1.6">'+esc(c.x||"")+'</div>'
+        + '<a href="'+esc(c.u)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;'
+        + 'font-size:11px;color:#54d8c4">查看原始頁面 →</a></div>')
+      .addTo(map);
+  }
+
+  /* ---------- toggles ---------- */
+  var tg = {parks:true, meters:true, cafes:false, free:false};
+  function applyToggles(){
+    var map = ST.map;
+    if (!map || !map.getLayer("park-dot")) return;
+    var vis = function(id, on){ map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); };
+    vis("park-halo", tg.parks); vis("park-dot", tg.parks);
+    vis("meter-dot", tg.meters); vis("cafe-dot", tg.cafes);
+    var f = tg.free ? [">=",["get","v"],3] : null;
+    map.setFilter("park-dot", f); map.setFilter("park-halo", f);
+  }
+  [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],["tg-free","free"]].forEach(function(pair){
+    var b = document.getElementById(pair[0]);
+    b.setAttribute("aria-pressed", tg[pair[1]]);
+    b.addEventListener("click", function(){
+      tg[pair[1]] = !tg[pair[1]];
+      b.setAttribute("aria-pressed", tg[pair[1]]);
+      applyToggles();
+    });
+  });
+
+  /* ---------- search ---------- */
+  function wireSearch(){
+    var q = document.getElementById("q");
+    var box = document.getElementById("results");
+    q.addEventListener("input", function(){
+      var v = q.value.trim().toLowerCase();
+      box.innerHTML = "";
+      if (!v) return;
+      var hits = [];
+      ST.parks.forEach(function(p){
+        if (((p.n+" "+p.e+" "+p.d+" "+p.a)||"").toLowerCase().indexOf(v) >= 0)
+          hits.push({t:p.n, s:p.d+(p.v>=0?" · 空位 "+p.v:" · 無讀數"), la:p.la, lo:p.lo, z:15});
+      });
+      ST.cafes.forEach(function(c){
+        if (((c.n+" "+c.d+" "+c.a)||"").toLowerCase().indexOf(v) >= 0)
+          hits.push({t:c.n, s:"Cafe · "+(c.d||"")+(c.h?" · "+c.h:""), la:c.la, lo:c.lo, z:16});
+      });
+      ST.meters.forEach(function(m){
+        if (m[3] !== 0) return;
+        if (((m[4]+" "+m[5])||"").toLowerCase().indexOf(v) >= 0)
+          hits.push({t:m[4], s:"空置咪錶位 "+m[0]+" · "+(m[5]||""), la:m[1], lo:m[2], z:17});
+      });
+      if (!hits.length){ box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>'; return; }
+      hits.slice(0,8).forEach(function(h){
+        var el = document.createElement("div");
+        el.className = "pk-hit";
+        el.innerHTML = "<b>"+esc(h.t)+"</b><span>"+esc(h.s)+"</span>";
+        el.addEventListener("click", function(){
+          if (!ST.map) return;
+          ST.map.flyTo({center:[h.lo,h.la], zoom:h.z, duration:900});
+        });
+        box.appendChild(el);
+      });
+    });
+  }
+
+  /* ---------- cafe list ---------- */
+  var cf = {q:"", dist:"", shown:0, size:24, rows:[]};
+  function renderCafes(){
+    var list = document.getElementById("cf-list");
+    var cnt = document.getElementById("cf-count");
+    var more = document.getElementById("cf-more");
+    var v = cf.q.trim().toLowerCase();
+    cf.rows = ST.cafes.filter(function(c){
+      if (cf.dist && c.d !== cf.dist) return false;
+      if (!v) return true;
+      return ((c.n+" "+c.a+" "+c.d)||"").toLowerCase().indexOf(v) >= 0;
+    });
+    cnt.textContent = "共 " + cf.rows.length + " 間" + (cf.dist ? "（" + cf.dist + "）" : "");
+    var slice = cf.rows.slice(0, cf.shown + cf.size);
+    cf.shown = slice.length;
+    list.innerHTML = slice.map(function(c){
+      var mono = esc((c.n||"?").trim().charAt(0));
+      return '<div class="cf-card">'
+        + '<div class="cf-head"><div class="cf-mono">'+mono+'</div>'
+        + '<div class="t"><h3>'+esc(c.n)+'</h3>'
+        + '<div class="sub">'+esc(c.d||"")+(c.a ? " · "+esc(c.a) : "")+'</div></div></div>'
+        + (c.h ? '<div class="cf-hours">'+esc(c.h)+'</div>' : "")
+        + (c.x ? '<div class="cf-x">'+esc(c.x)+'</div>' : "")
+        + '<div class="cf-actions">'
+        + '<button data-i="'+esc(c.s)+'">在地圖看</button>'
+        + (c.t ? '<a href="tel:'+esc(c.t.replace(/[^+\d]/g,""))+'">'+esc(c.t)+'</a>' : "")
+        + '<a href="'+esc(c.u)+'" target="_blank" rel="noopener">原站</a>'
+        + "</div></div>";
+    }).join("");
+    more.style.display = cf.shown < cf.rows.length ? "block" : "none";
+    Array.prototype.forEach.call(list.querySelectorAll("button[data-i]"), function(b){
+      b.addEventListener("click", function(){
+        var slug = b.getAttribute("data-i");
+        var c = ST.cafes.filter(function(x){ return x.s === slug; })[0];
+        if (!c) return;
+        showTab("tab-park");
+        tg.cafes = true;
+        document.getElementById("tg-cafes").setAttribute("aria-pressed", "true");
+        setTimeout(function(){
+          if (!ST.map) return;
+          applyToggles();
+          ST.map.resize();
+          ST.map.flyTo({center:[c.lo, c.la], zoom:16.4, duration:900});
+        }, 140);
+      });
+    });
+  }
+  function wireCafeUI(){
+    document.getElementById("cf-q").addEventListener("input", function(){
+      cf.q = this.value; cf.shown = 0; renderCafes();
+    });
+    document.getElementById("cf-dist").addEventListener("change", function(){
+      cf.dist = this.value; cf.shown = 0; renderCafes();
+    });
+    document.getElementById("cf-more").addEventListener("click", function(){
+      cf.size += 24; cf.shown = cf.shown; renderCafes();
+    });
+  }
+
+  /* ---------- data ---------- */
+  function loadData(){
+    var bust = "?t=" + Date.now();
+    return Promise.all([
+      fetch("data/parking.json"+bust).then(function(r){ return r.json(); }),
+      fetch("data/meters.json"+bust).then(function(r){ return r.json(); }),
+      fetch("data/cafes.json"+bust).then(function(r){ return r.json(); })
+    ]).then(function(res){
+      var pk = res[0], mt = res[1], fc = res[2];
+      ST.parks = pk.parks || []; ST.meters = mt.spaces || []; ST.cafes = fc.cafes || [];
+      ST.pm = pk; ST.mm = mt; ST.cm = fc;
+
+      var total = 0, open = 0, none = 0;
+      ST.parks.forEach(function(p){
+        if (p.v > 0) { total += p.v; open++; } else if (p.v < 0) none++;
+      });
+      document.getElementById("s-vac").textContent = num(total);
+      document.getElementById("s-open").textContent = open + " / " + ST.parks.length;
+      document.getElementById("s-meter").textContent = num(mt.vacant || 0);
+      document.getElementById("s-time").textContent = pk.last_update || pk.generated;
+
+      var districts = {};
+      ST.cafes.forEach(function(c){ if (c.d) districts[c.d] = (districts[c.d]||0)+1; });
+      var sel = document.getElementById("cf-dist");
+      Object.keys(districts).sort().forEach(function(d){
+        var o = document.createElement("option");
+        o.value = d; o.textContent = d + " (" + districts[d] + ")";
+        sel.appendChild(o);
+      });
+      document.getElementById("cf-sub").textContent =
+        ST.cafes.length + " 間咖啡店 · 資料為事實欄位與原文節錄 · 不含照片與標誌";
+
+      if (ST.map) drawLayers(ST.map);
+      renderCafes();
+    }).catch(function(){
+      document.getElementById("s-time").textContent = "資料載入失敗（請用 http 伺服器開啟）";
+      document.getElementById("cf-sub").textContent = "資料載入失敗（請用 http 伺服器開啟）";
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    wireSearch(); wireCafeUI();
+    if (["park","cafe"].indexOf(hash) >= 0) showTab("tab-" + hash);
+    loadData();
+    setInterval(loadData, 5 * 60 * 1000);
+  });
+
+  window.addEventListener("hashchange", function(){
+    var h = (location.hash || "").replace("#","");
+    if (["now","park","cafe"].indexOf(h) >= 0) showTab("tab-" + h);
+  });
+})();
+
+</script>
+
 </body>
 </html>

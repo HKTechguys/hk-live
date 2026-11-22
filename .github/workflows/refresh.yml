@@ -1,0 +1,38 @@
+name: Refresh parking data
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-parking
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pull Transport Department data and rebuild JSON
+        run: python tools/refresh_parking.py
+
+      - name: Commit if the data moved
+        run: |
+          git config user.name "hk-live-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/parking.json data/meters.json
+          if git diff --quiet --cached; then
+            echo "no change"
+          else
+            git commit -m "chore: refresh TD parking data $(date -u +'%Y-%m-%dT%H:%MZ')"
+            git push
+          fi
