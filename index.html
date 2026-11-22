@@ -284,6 +284,22 @@ body{overflow:hidden;height:100vh}
   border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
 .mt-bar button[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45)}
 .mt-bar .cf-count{margin:0}
+.mt-bar .mt-wdist[aria-pressed="true"],.mt-bar .mt-wdist.on{color:#ffd166;border-color:rgba(255,209,102,.45)}
+.mt-wbox{border:1px solid rgba(255,209,102,.28);background:rgba(255,209,102,.05);border-radius:11px;
+  padding:9px 11px;margin:2px 0 10px}
+.mt-whead{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:#ffd166}
+.mt-whead b{font-weight:600}
+.mt-whead span{color:var(--dim);font-size:10.5px}
+.mt-wlist{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.mt-wrow{display:flex;align-items:center;gap:8px;font-size:12px;color:#dfe9ea;
+  border:1px solid rgba(255,209,102,.18);background:rgba(9,14,20,.55);border-radius:8px;padding:6px 9px}
+.mt-wrow em{font-style:normal;color:var(--dim);font-size:10.5px;margin-left:auto;white-space:nowrap}
+.mt-wrow b{font-weight:600}
+.mt-wdel{font:inherit;font-size:13px;line-height:1;color:var(--dim);background:none;border:0;cursor:pointer;
+  padding:2px 4px;border-radius:6px}
+.mt-wdel:hover{color:#ff6b78;background:rgba(255,107,120,.12)}
+.mt-wtag{font-size:9.5px;color:#0b1016;background:#ffd166;border-radius:5px;padding:1px 5px;margin-left:2px}
+.mt-whint{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:6px}
 .mt-list{display:flex;flex-direction:column;gap:7px}
 .mt-row{border:1px solid var(--line);border-radius:10px;background:#0d151d;overflow:hidden}
 .mt-head{display:flex;align-items:center;gap:10px;padding:9px 11px}
@@ -845,15 +861,22 @@ setInterval(loadRadar, 720000);
       <input id="mt-q" type="search" placeholder="街道／地區，例如 麼地道">
       <select id="mt-dist"><option value="">全部地區</option></select>
     </div>
+    <div class="mt-wbox" id="mt-wbox">
+      <div class="mt-whead"><b>★ 提醒清單</b><span id="mt-wsum"></span></div>
+      <div class="mt-wlist" id="mt-wlist"></div>
+      <div class="mt-whint" id="mt-whint">未設提醒 — 撳街道右邊「☆ 提醒」、或下面「☆ 提醒此地區」，有位就通知你。</div>
+    </div>
     <div class="mt-bar">
       <button id="mt-onlyfree" aria-pressed="false">只看現在有位</button>
+      <button id="mt-wdist" class="mt-wdist" hidden>☆ 提醒此地區</button>
       <span id="mt-count" class="cf-count"></span>
     </div>
     <div class="mt-list" id="mt-list"></div>
     <button class="cf-more" id="mt-more" style="display:none">顯示更多街道</button>
     <div class="cf-note">
       按街道分組，預設按「現在空置位」多寡排序，撳街名可展開該街每個位。<br>
-      按「☆ 提醒」＝整條街任何一個位由佔用中變空置就通知你。狀態資料每 10 分鐘更新。
+      「☆ 提醒」可設整條街、整個地區或單一位；狀態由佔用中變空置即通知。<br>
+      面板開着時直連運輸署即時數據（有提醒 75 秒、其他 3 分鐘）；收起後靠每 10 分鐘更新的資料。
     </div>
   </div>
 </section>
@@ -1268,13 +1291,17 @@ setInterval(loadRadar, 720000);
     for (var i = 0; i < WT.list.length; i++) if (WT.list[i].id === id) return true;
     return false;
   }
+  function wtHasDistrict(d){
+    for (var i = 0; i < WT.list.length; i++) if (WT.list[i].dist === d) return true;
+    return false;
+  }
   function wtChip(){
     var el = document.getElementById("pk-watch");
     if (!el) return;
     if (!WT.list.length) { el.hidden = true; el.textContent = ""; el.removeAttribute("title"); return; }
     el.hidden = false;
-    el.textContent = "★ 提醒中 " + WT.list.length + " 個咪錶位 · 變空置即通知";
-    el.title = WT.list.map(function(w){ return (w.n || "") + " " + w.id; }).join(" / ");
+    el.textContent = "★ 提醒中 " + WT.list.length + " 項 · 變空置即通知";
+    el.title = WT.list.map(function(w){ return w.dist ? (w.dist + "（全區）") : w.s ? (w.s + "（全街）") : ((w.n || "") + " " + w.id); }).join(" / ");
   }
   function wtAsk(){
     if (!("Notification" in window)) return;
@@ -1306,18 +1333,52 @@ setInterval(loadRadar, 720000);
     wtPersist();
     if (typeof renderMeters === "function") renderMeters();
   }
-  function wtNotice(w){
-    var title, body;
-    if (w.street) { title = "有位！" + w.street; body = w.cnt + " 個位剛空出：" + w.ids.join("、"); }
-    else { title = "有位！" + (w.n || "路邊泊車位"); body = "位號 " + w.id + " 由佔用中變空置"; }
+  function wtNotice(h){
+    var title, body, tag;
+    if (h.street) { title = "有位！" + h.street; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-s-" + h.street; }
+    else if (h.district) { title = "有位！" + h.district; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-d-" + h.district; }
+    else { title = "有位！" + (h.w.n || "路邊泊車位"); body = "位號 " + h.w.id + " 由佔用中變空置"; tag = "hkwt-" + h.w.id; }
     if ("Notification" in window && Notification.permission === "granted") {
       try {
-        var n = new Notification(title, {body: body, tag: "hkwt-" + (w.street || w.id)});
+        var n = new Notification(title, {body: body, tag: tag});
         n.onclick = function(){ try { window.focus(); } catch(e){} };
       } catch(e){}
     }
     toast(title + " · " + body);
     if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch(e){} }
+  }
+  function wtSeedScope(w){
+    var arr = ST.meters || [], i, s, d, id;
+    for (i = 0; i < arr.length; i++) {
+      id = String(arr[i][0]); s = arr[i][4] || ""; d = arr[i][5] || "";
+      if (w.dist ? d === w.dist : w.s ? (s === w.s && d === (w.d || "")) : id === String(w.id)) {
+        WT.seen[id] = Number(arr[i][3]);
+      }
+    }
+  }
+  function wtToggleDistrict(d){
+    if (!d) return;
+    var i = -1;
+    for (var k = 0; k < WT.list.length; k++) if (WT.list[k].dist === d) { i = k; break; }
+    if (i >= 0) { WT.list.splice(i, 1); toast("已取消提醒 · " + d + "（全區）"); }
+    else {
+      var w = {dist: d};
+      WT.list.push(w); wtSeedScope(w); wtAsk();
+      toast("已加入提醒 · " + d + " 全區，有位即通知");
+    }
+    wtPersist();
+    if (typeof renderMeters === "function") renderMeters();
+  }
+  function wtRemove(t, key){
+    for (var i = 0; i < WT.list.length; i++) {
+      var w = WT.list[i];
+      if (t === "d" && w.dist === key) { WT.list.splice(i, 1); break; }
+      if (t === "s" && w.s && (w.s + "|" + (w.d || "")) === key) { WT.list.splice(i, 1); break; }
+      if (t === "i" && w.id === key) { delete WT.seen[key]; WT.list.splice(i, 1); break; }
+    }
+    wtPersist();
+    if (typeof renderMeters === "function") renderMeters();
+    toast("已取消提醒");
   }
   function wtToggleStreet(s, d){
     var i = -1;
@@ -1326,13 +1387,17 @@ setInterval(loadRadar, 720000);
       if (w.s && w.s === s && (w.d || "") === (d || "")) { i = k; break; }
     }
     if (i >= 0) { WT.list.splice(i, 1); toast("已取消提醒 · " + s); }
-    else { WT.list.push({s: s, d: d || ""}); wtAsk(); toast("已加入提醒 · " + s + "（整條街有位即通知）"); }
+    else {
+      var w = {s: s, d: d || ""};
+      WT.list.push(w); wtSeedScope(w); wtAsk();
+      toast("已加入提醒 · " + s + "（整條街有位即通知）");
+    }
     wtPersist();
     if (typeof renderMeters === "function") renderMeters();
   }
   function wtCheck(spaces){
     if (!WT.list.length) return;
-    var map = {}, meta = {}, i;
+    var map = {}, meta = {}, i, k;
     for (i = 0; i < spaces.length; i++) {
       var sid = String(spaces[i][0]);
       map[sid] = Number(spaces[i][3]);
@@ -1340,24 +1405,22 @@ setInterval(loadRadar, 720000);
     }
     var hits = [];
     WT.list.forEach(function(w){
+      var ids = [], n = 0, got = [];
       if (w.s) {
-        var n = 0, ids = [];
-        for (var k in map) {
-          if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
-          if (meta[k][0] !== w.s || meta[k][1] !== (w.d || "")) continue;
-          if (WT.seen[k] === 1 && map[k] === 0) { n++; if (ids.length < 4) ids.push(k); }
-          WT.seen[k] = map[k];
-        }
-        if (n) hits.push({street: w.s, cnt: n, ids: ids});
-      } else {
-        var now = map[w.id], prev = WT.seen[w.id];
-        if (now === undefined) return;
-        if (prev === 1 && now === 0) hits.push(w);
-        WT.seen[w.id] = now;
+        for (k in map) if (meta[k][0] === w.s && meta[k][1] === (w.d || "")) ids.push(k);
+      } else if (w.dist) {
+        for (k in map) if (meta[k][1] === w.dist) ids.push(k);
+      } else if (w.id !== undefined) {
+        if (map[w.id] !== undefined) ids.push(String(w.id));
       }
+      ids.forEach(function(id){
+        if (WT.seen[id] === 1 && map[id] === 0) { n++; if (got.length < 4) got.push(id); }
+        WT.seen[id] = map[id];
+      });
+      if (n) hits.push({w: w, street: w.s, district: w.dist, cnt: n, ids: got});
     });
     wtPersist();
-    hits.forEach(function(w, k){ setTimeout(function(){ wtNotice(w); }, k * 600); });
+    hits.forEach(function(h, k){ setTimeout(function(){ wtNotice(h); }, k * 600); });
   }
 
   function parkPopup(e){
@@ -1664,6 +1727,60 @@ setInterval(loadRadar, 720000);
     return false;
   }
   function metColor(st){ return st === 0 ? "#54d8c4" : st === 1 ? "#ff6b78" : "#3a4757"; }
+  function mtStatusOf(id){
+    var arr = ST.meters || [];
+    for (var i = 0; i < arr.length; i++) if (String(arr[i][0]) === String(id)) return Number(arr[i][3]);
+    return -1;
+  }
+  function mtVacOfStreet(s, d){
+    var o = meterCache()[s + "|" + (d || "")];
+    return o ? {v: o.v, n: o.n} : {v: 0, n: 0};
+  }
+  function mtVacOfDist(d){
+    var g = meterCache(), v = 0, n = 0;
+    for (var k in g) if (g[k].d === d) { v += g[k].v; n += g[k].n; }
+    return {v: v, n: n};
+  }
+  function renderWatchBox(){
+    var list = document.getElementById("mt-wlist");
+    if (!list) return;
+    var hint = document.getElementById("mt-whint"), sum = document.getElementById("mt-wsum");
+    var b = document.getElementById("mt-wdist");
+    if (b) {
+      var d = MI.dist;
+      b.hidden = !d;
+      if (d) {
+        var on = wtHasDistrict(d);
+        b.textContent = (on ? "★ 已提醒 " : "☆ 提醒 ") + d;
+        b.classList.toggle("on", on);
+      }
+    }
+    if (!WT.list.length) {
+      list.innerHTML = ""; if (hint) hint.hidden = false;
+      if (sum) sum.textContent = "";
+      return;
+    }
+    if (hint) hint.hidden = true;
+    if (sum) sum.textContent = "共 " + WT.list.length + " 項";
+    list.innerHTML = WT.list.map(function(w){
+      var name, info, t, key, tag;
+      if (w.dist) {
+        var a = mtVacOfDist(w.dist);
+        name = esc(w.dist); tag = "全區"; info = "空置 " + a.v + " / " + a.n; t = "d"; key = w.dist;
+      } else if (w.s) {
+        var c = mtVacOfStreet(w.s, w.d);
+        name = esc(w.s) + (w.d ? ' <span style="color:#8fa3ad">' + esc(w.d) + "</span>" : "");
+        tag = "全街"; info = "空置 " + c.v + " / " + c.n; t = "s"; key = w.s + "|" + (w.d || "");
+      } else {
+        var st = mtStatusOf(w.id);
+        name = esc(w.id) + (w.n ? ' <span style="color:#8fa3ad">' + esc(w.n) + "</span>" : "");
+        tag = "單位"; info = st === 0 ? "空置" : st === 1 ? "佔用中" : "無讀數"; t = "i"; key = String(w.id);
+      }
+      return '<div class="mt-wrow"><b>' + name + '</b><i class="mt-wtag">' + tag + '</i>'
+        + '<em>' + info + '</em>'
+        + '<button class="mt-wdel" data-wdt="' + t + '" data-wdk="' + esc(key) + '" title="取消提醒">✕</button></div>';
+    }).join("");
+  }
   function renderMeters(){
     var list = document.getElementById("mt-list");
     if (!list) return;
@@ -1705,6 +1822,7 @@ setInterval(loadRadar, 720000);
         + '</div>';
     }).join("");
     document.getElementById("mt-more").style.display = slice.length < rows.length ? "block" : "none";
+    renderWatchBox();
   }
   function wireMeterUI(){
     var ob = document.getElementById("open-meter");
@@ -1726,6 +1844,9 @@ setInterval(loadRadar, 720000);
     document.getElementById("mt-more").addEventListener("click", function(){
       MI.shown += MI.size; renderMeters();
     });
+    document.getElementById("mt-wdist").addEventListener("click", function(){
+      wtToggleDistrict(MI.dist);
+    });
     document.addEventListener("click", function(e){
       var m = e.target.closest && e.target.closest("[data-ms]");
       if (m) {
@@ -1737,6 +1858,8 @@ setInterval(loadRadar, 720000);
       }
       var mx = e.target.closest && e.target.closest("[data-msp]");
       if (mx) { MI.sp += 30; renderMeters(); return; }
+      var dl = e.target.closest && e.target.closest("[data-wdt]");
+      if (dl) { e.preventDefault(); wtRemove(dl.getAttribute("data-wdt"), dl.getAttribute("data-wdk")); return; }
       var w = e.target.closest && e.target.closest("[data-ws]");
       if (w) { wtToggleStreet(w.getAttribute("data-ws"), w.getAttribute("data-wd"), w); }
     });
