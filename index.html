@@ -285,6 +285,8 @@ body{overflow:hidden;height:100vh}
 .mt-bar button[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45)}
 .mt-bar .cf-count{margin:0}
 .mt-bar .mt-wdist[aria-pressed="true"],.mt-bar .mt-wdist.on{color:#ffd166;border-color:rgba(255,209,102,.45)}
+.mt-bar .mt-refresh{color:var(--teal);border-color:rgba(84,216,196,.35)}
+.mt-bar .mt-refresh[disabled]{opacity:.55;cursor:default}
 .mt-wbox{border:1px solid rgba(255,209,102,.28);background:rgba(255,209,102,.05);border-radius:11px;
   padding:9px 11px;margin:2px 0 10px}
 .mt-whead{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:#ffd166}
@@ -869,6 +871,7 @@ setInterval(loadRadar, 720000);
     <div class="mt-bar">
       <button id="mt-onlyfree" aria-pressed="false">只看現在有位</button>
       <button id="mt-wdist" class="mt-wdist" hidden>☆ 提醒此地區</button>
+      <button id="mt-refresh" class="mt-refresh" title="即刻拉運輸署最新狀態">↻ 更新</button>
       <span id="mt-count" class="cf-count"></span>
     </div>
     <div class="mt-list" id="mt-list"></div>
@@ -1847,6 +1850,7 @@ setInterval(loadRadar, 720000);
     document.getElementById("mt-wdist").addEventListener("click", function(){
       wtToggleDistrict(MI.dist);
     });
+    document.getElementById("mt-refresh").addEventListener("click", liveManual);
     document.addEventListener("click", function(e){
       var m = e.target.closest && e.target.closest("[data-ms]");
       if (m) {
@@ -1868,11 +1872,11 @@ setInterval(loadRadar, 720000);
   /* ---------- 咪錶即時（面板開住時直連運輸署 CSV） ---------- */
   var LIVE = {
     url: "https://resource.data.one.gov.hk/td/psiparkingspaces/occupancystatus/occupancystatus.csv",
-    timer: null, on: false, at: "", ok: null, busy: false
+    timer: null, on: false, at: "", ok: null, busy: false, cbs: [], manual: false
   };
   function liveTime(){
     var d = new Date(Date.now() + 8 * 3600000);
-    return d.toISOString().slice(11, 16);
+    return d.toISOString().slice(11, 19);
   }
   function liveGap(){
     var c = navigator.connection || {};
@@ -1883,8 +1887,8 @@ setInterval(loadRadar, 720000);
     var s = "共 " + (MI.total || 0).toLocaleString() + " 個路邊位、現時空置 " + (MI.vac || 0).toLocaleString() + " 個";
     if (LIVE.on) {
       var gap = liveGap(), lab = gap < 120000 ? Math.round(gap / 1000) + " 秒" : Math.round(gap / 60000) + " 分鐘";
-      s += LIVE.ok === false ? "；即時更新暫時失敗，稍後自動重試"
-        : "；直連運輸署即時數據，每 " + lab + "更新" + (LIVE.at ? "（上次 " + LIVE.at + "）" : "…");
+      s += LIVE.ok === false ? "；即時更新失敗，稍後自動重試"
+        : "；直連運輸署，每 " + lab + "自動更新" + (LIVE.at ? "（最後 " + LIVE.at + "）" : "…");
     } else {
       s += "；資料每 10 分鐘更新";
     }
@@ -1911,13 +1915,38 @@ setInterval(loadRadar, 720000);
       livePull();
     }, liveGap());
   }
-  function livePull(){
-    if (!LIVE.on || LIVE.busy) return;
+  function livePull(cb){
+    if (!LIVE.on) { if (cb) cb(false); return; }
+    if (LIVE.busy) { if (cb) LIVE.cbs.push(cb); return; }
     LIVE.busy = true;
     fetch(LIVE.url + "?t=" + Date.now(), {cache: "no-store"})
       .then(function(r){ if (!r.ok) throw new Error(r.status); return r.text(); })
-      .then(function(txt){ LIVE.busy = false; LIVE.ok = true; liveApply(txt); liveNext(); })
-      .catch(function(){ LIVE.busy = false; LIVE.ok = false; liveSub(); liveNext(); });
+      .then(function(txt){
+        LIVE.busy = false; LIVE.ok = true; liveApply(txt); liveNext();
+        var cbs = LIVE.cbs.splice(0); cbs.forEach(function(f){ f(true); });
+        if (cb) cb(true);
+      })
+      .catch(function(){
+        LIVE.busy = false; LIVE.ok = false; liveSub(); liveNext();
+        var cbs = LIVE.cbs.splice(0); cbs.forEach(function(f){ f(false); });
+        if (cb) cb(false);
+      });
+  }
+  function liveManual(){
+    var btn = document.getElementById("mt-refresh"), fin = false;
+    var reset = function(){ if (btn) { btn.disabled = false; btn.textContent = "↻ 更新"; } };
+    var done = function(ok){
+      if (fin) return;
+      fin = true; reset();
+      if (ok) {
+        toast("已更新 · " + (LIVE.at || "") + " · 空置 " + num(ST.live ? ST.live.vacant : 0) + " 個");
+      } else {
+        toast("更新失敗，請檢查網絡後再試");
+      }
+    };
+    if (btn) { btn.disabled = true; btn.textContent = "更新中…"; }
+    livePull(done);
+    setTimeout(function(){ if (!fin) { fin = true; reset(); } }, 20000);
   }
   document.addEventListener("visibilitychange", function(){
     if (LIVE.on && !document.hidden) livePull();
@@ -1943,6 +1972,7 @@ setInterval(loadRadar, 720000);
     LIVE.at = liveTime();
     MI.cache = null;
     ST.live = {at: LIVE.at, rows: n, vacant: seenVac};
+    if (ST.mm) ST.mm.last_update = "即時 " + LIVE.at;
     var sm = document.getElementById("s-meter");
     if (sm) sm.textContent = num(seenVac);
     if (ST.map && arr.length) {
