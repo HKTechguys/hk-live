@@ -227,6 +227,13 @@ body{overflow:hidden;height:100vh}
 .tr-head p{font-size:11.5px;color:var(--dim);margin:0;line-height:1.6}
 .tr-q{width:100%;margin:12px 0 6px;font:inherit;font-size:12.5px;padding:9px 12px;
   border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--ink)}
+.tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.tr-levels::-webkit-scrollbar{display:none}
+.tr-levels button{font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
+  border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;white-space:nowrap}
+.tr-levels button[aria-pressed="true"]{color:var(--ink);background:rgba(255,255,255,.06)}
+.lv{display:inline-block;font-size:10px;line-height:1.5;padding:1px 7px;border-radius:6px;
+  border:1px solid currentColor;margin-right:6px;vertical-align:1px}
 .tr-count{font-size:11px;color:var(--dim);margin:2px 0 10px}
 .tr-list{display:flex;flex-direction:column;gap:8px}
 .tr-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
@@ -750,12 +757,14 @@ setInterval(loadRadar, 720000);
       <p id="tr-sub">載入中…</p>
     </div>
     <input id="tr-q" type="search" class="tr-q" placeholder="路線名，例如 麥理浩徑 / 衛奕信徑 / 家樂徑">
+    <div class="tr-levels" id="tr-levels"></div>
     <div class="tr-count" id="tr-count"></div>
     <div class="tr-list" id="tr-list"></div>
     <div class="tr-note">
       幾何來自 OpenStreetMap 的 route=hiking 路線（© OpenStreetMap contributors，ODbL）；
       標距柱點位來自漁農自然護理署開放數據（AFCD_Distance_Post.csv）。
-      長度為沿線幾何累加估算，只作參考；實際路況、封閉安排與難度請以漁護署官方公布為準。
+      長度為沿線幾何累加估算，只作參考；難度（易行／普通／費力／難行／非常難行）對應
+      hiking.gov.hk 的官方星級評分，官方未評級者列為「未列入」。實際路況、封閉安排與難度請以漁護署公布為準。
     </div>
   </div>
 </section>
@@ -786,7 +795,7 @@ setInterval(loadRadar, 720000);
   "use strict";
 
   var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], pm:{}, mm:{}, cm:{}, trailMeta:{}, map:null, booted:false };
-  var TM = { map:null, booted:false, loaded:false, loading:false, hl:-1, tg:{lines:true, posts:true} };
+  var TM = { map:null, booted:false, loaded:false, loading:false, hl:-1, lv:"", tg:{lines:true, posts:true} };
   var esc = function(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -1116,6 +1125,29 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- 山徑 map ---------- */
+  var LVC = {"易行":"#54d8c4","普通":"#ffd166","費力":"#ff9f43","難行":"#ff6b78",
+             "非常難行":"#ff4d8d","未列入":"#8fa3ad"};
+  var LVORDER = ["易行","普通","費力","難行","非常難行","未列入"];
+
+  function renderLevels(){
+    var box = document.getElementById("tr-levels");
+    var rows = LVORDER.map(function(l){
+      var n = ST.trails.filter(function(t){ return t.lv === l; }).length;
+      if (!n) return "";
+      var c = LVC[l] || "#8fa3ad";
+      var on = TM.lv === l;
+      return '<button data-lv="'+l+'" aria-pressed="'+on+'" style="color:'+(on ? c : "")+
+        ';border-color:'+(on ? c : "")+'">'+l+' '+n+'</button>';
+    }).join("");
+    box.innerHTML = '<button data-lv="" aria-pressed="'+(TM.lv === "" ? "true" : "false")+'">全部</button>' + rows;
+    Array.prototype.forEach.call(box.querySelectorAll("button"), function(b){
+      b.addEventListener("click", function(){
+        TM.lv = b.getAttribute("data-lv");
+        renderLevels(); renderTrails();
+      });
+    });
+  }
+
   function bootTrailMap(){
     if (TM.booted || !window.maplibregl) return;
     TM.booted = true;
@@ -1271,17 +1303,20 @@ setInterval(loadRadar, 720000);
     var list = document.getElementById("tr-list");
     var q = (document.getElementById("tr-q").value || "").trim().toLowerCase();
     var rows = ST.trails.map(function(t,i){ return {t:t, i:i}; }).filter(function(r){
+      if (TM.lv && r.t.lv !== TM.lv) return false;
       if (!q) return true;
       return ((r.t.n + " " + r.t.e) || "").toLowerCase().indexOf(q) >= 0;
     });
-    document.getElementById("tr-count").textContent = q
-      ? "搜到 " + rows.length + " 條路線" : "共 " + ST.trails.length + " 條路線，依長度排序";
+    document.getElementById("tr-count").textContent =
+      (q || TM.lv ? "符合 " : "共 ") + rows.length + " 條路線"
+      + (TM.lv ? "（" + TM.lv + "）" : "") + (q ? "" : "，依長度排序");
     if (!rows.length) { list.innerHTML = '<div class="tr-card"><div class="sub">冇匹配路線</div></div>'; return; }
     list.innerHTML = rows.map(function(r){
       var t = r.t;
+      var c = LVC[t.lv] || "#8fa3ad";
       return '<div class="tr-card'+(TM.hl === r.i ? " sel" : "")+'" data-i="'+r.i+'">'
         + '<div class="t"><h3>'+esc(t.n || t.e)+'</h3><span class="km">約 '+t.len+' km</span></div>'
-        + (t.e && t.n ? '<div class="sub">'+esc(t.e)+'</div>' : "")
+        + '<div class="sub"><span class="lv" style="color:'+c+'">'+esc(t.lv)+'</span>'+esc(t.e || "")+'</div>'
         + '<div class="acts"><button data-fly="'+r.i+'">在地圖看</button></div>'
         + "</div>";
     }).join("");
@@ -1314,6 +1349,7 @@ setInterval(loadRadar, 720000);
       document.getElementById("tr-sub").textContent =
         "漁護署郊野公園遠足徑 · " + ST.trails.length + " 條路線 · " + num(ST.posts.length)
         + " 支標距柱 · 幾何 OpenStreetMap（ODbL）";
+      renderLevels();
       renderTrails();
       if (TM.map) syncTrailLayers(TM.map);
     }).catch(function(){
