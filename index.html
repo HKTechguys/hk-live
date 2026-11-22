@@ -1094,14 +1094,16 @@ setInterval(loadRadar, 720000);
       + "&mode=car&callnative=1&coordinate=gaode";
     var cm = "https://citymapper.com/directions?endcoord=" + la.toFixed(6) + "," + lo.toFixed(6)
       + (q ? "&endname=" + q : "");
+    var wz = "https://www.waze.com/ul?ll=" + la.toFixed(6) + "," + lo.toFixed(6) + "&navigate=yes&zoom=17";
     var list = [
       {l:"Google 地圖", s:"駕車 / 步行 / 公共交通", u:g},
+      {l:"Waze", s:"即時路況、避塞車", u:wz},
       {l:"Apple 地圖", s:"iPhone、iPad 內置", u:ap},
       {l:"高德地圖", s:"內地 / 跨境常用", u:am},
       {l:"Citymapper", s:"公共交通、轉車建議", u:cm}
     ];
-    if (isIOS()) list = [list[1], list[0], list[3], list[2]];
-    else if (isAndroid()) list = [list[0], list[2], list[3], list[1]];
+    if (isIOS()) list = [list[2], list[1], list[0], list[4], list[3]];
+    else if (isAndroid()) list = [list[0], list[1], list[3], list[4], list[2]];
     return list;
   }
   var NAVM = null;
