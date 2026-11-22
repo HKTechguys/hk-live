@@ -1316,7 +1316,6 @@ setInterval(loadRadar, 720000);
         + " 支標距柱 · 幾何 OpenStreetMap（ODbL）";
       renderTrails();
       if (TM.map) syncTrailLayers(TM.map);
-      if (!TM.fitted) { TM.fitted = true; fitAll(); }
     }).catch(function(){
       TM.loading = false;
       document.getElementById("tr-sub").textContent = "山徑資料載入失敗（請用 http 伺服器開啟）";
