@@ -95,7 +95,7 @@
 </style>
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-/* ===== 整合 tab 層：沿用原站 teal/dark 主題 ===== */
+/* ===== 單一地圖頁 + 底部清單面板（沿用原站 teal/dark 主題） ===== */
 :root{
   --tabh:52px;
   --free:#54d8c4; --low:#ffd166; --mid:#ff9f43; --full:#ff6b78; --none:#3a4757;
@@ -125,7 +125,7 @@ body{overflow:hidden;height:100vh}
 #p-now .wind{position:fixed}
 #p-now .wrap{margin-top:0}
 
-/* ---------- 泊車 tab ---------- */
+/* ---------- 地圖頁 ---------- */
 #p-park{padding-top:var(--tabh);height:100vh;position:relative;background:#070a10}
 #map{position:absolute;top:var(--tabh);left:0;right:0;bottom:0}
 .pk-hud{
@@ -139,15 +139,28 @@ body{overflow:hidden;height:100vh}
 .pk-chip i{display:block;font-style:normal;font-size:9.5px;color:var(--dim);letter-spacing:.06em}
 .pk-chip b{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .pk-chip b.g{color:var(--free)} .pk-chip b.y{color:var(--low)}
+
+/* 左下角圖層開關 */
 .pk-tools{
-  position:absolute;bottom:14px;left:10px;z-index:20;display:flex;gap:6px;flex-wrap:wrap;
-  max-width:calc(100% - 20px);
+  position:absolute;bottom:14px;left:10px;z-index:21;display:flex;gap:6px;flex-wrap:wrap;
+  max-width:min(340px, calc(100% - 20px));
+  background:rgba(9,15,21,.55);border:1px solid var(--line);border-radius:12px;
+  padding:8px;backdrop-filter:blur(10px);
 }
 .pk-tools button{
   font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
   border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.pk-tools button::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:#3a4757;flex:none;
 }
 .pk-tools button[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45)}
+.pk-tools button[aria-pressed="true"]::before{background:var(--teal)}
+.pk-tools button.pk-list{color:var(--ink);border-color:rgba(255,255,255,.22)}
+.pk-tools button.pk-list::before{display:none}
+.pk-tools button.pk-list::after{content:"▸";color:var(--dim);font-size:10px}
+
 .pk-legend{
   position:absolute;bottom:14px;right:10px;z-index:20;
   background:rgba(13,19,29,.92);border:1px solid var(--line);border-radius:10px;
@@ -156,9 +169,9 @@ body{overflow:hidden;height:100vh}
 .pk-legend s{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;text-decoration:none}
 .pk-legend .h{color:var(--ink);font-size:11px;display:block;margin-bottom:3px}
 
-/* 搜尋列（泊車 tab） */
+/* 搜尋列 */
 .pk-search{
-  position:absolute;top:calc(var(--tabh) + 10px);right:10px;z-index:21;width:min(320px,60vw);
+  position:absolute;top:calc(var(--tabh) + 10px);right:10px;z-index:22;width:min(320px,60vw);
 }
 .pk-search input{
   width:100%;padding:8px 12px;border-radius:10px;border:1px solid var(--line);
@@ -173,13 +186,56 @@ body{overflow:hidden;height:100vh}
 .pk-hit b{display:block;font-size:12px}
 .pk-hit span{color:var(--dim);font-size:10px}
 
-/* ---------- Cafe tab ---------- */
-#p-cafe{padding-top:var(--tabh);height:100vh;overflow-y:auto;overflow-x:hidden}
-.cf-wrap{max-width:640px;margin:0 auto;padding:16px 16px 40px}
-.cf-top{margin-bottom:12px}
-.cf-top h2{font-size:17px;margin:0 0 4px;letter-spacing:.02em}
-.cf-top p{font-size:11.5px;color:var(--dim);margin:0;line-height:1.6}
-.cf-search{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+/* ---------- 底部清單面板 ---------- */
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;height:76vh;z-index:60;
+  background:#0b1016;border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;
+  box-shadow:0 -18px 40px rgba(0,0,0,.55);
+  overflow-y:auto;
+  transform:translateY(104%);transition:transform .24s ease;
+}
+.sheet.on{transform:none}
+.sheet-head{
+  position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:rgba(11,16,22,.96);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.sheet-head h2{font-size:15px;margin:0;letter-spacing:.02em}
+.sheet-close{
+  font:inherit;font-size:11.5px;color:var(--dim);background:rgba(255,255,255,.04);
+  border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer;
+}
+.sheet .inner{max-width:640px;margin:0 auto;padding:12px 16px 30px}
+.sheet-sub{font-size:11px;color:var(--dim);margin:0 0 10px;line-height:1.6}
+
+/* ---------- 山徑清單 ---------- */
+.tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.tr-levels::-webkit-scrollbar{display:none}
+.tr-levels button{font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
+  border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;white-space:nowrap}
+.tr-levels button[aria-pressed="true"]{color:var(--ink);background:rgba(255,255,255,.06)}
+.lv{display:inline-block;font-size:10px;line-height:1.5;padding:1px 7px;border-radius:6px;
+  border:1px solid currentColor;margin-right:6px;vertical-align:1px}
+.tr-q{width:100%;margin:4px 0 6px;font:inherit;font-size:12.5px;padding:9px 12px;
+  border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--ink)}
+.tr-count{font-size:11px;color:var(--dim);margin:2px 0 10px}
+.tr-list{display:flex;flex-direction:column;gap:8px}
+.tr-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
+.tr-card.sel{border-color:rgba(197,140,255,.55);background:rgba(197,140,255,.06)}
+.tr-card .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.tr-card h3{margin:0;font-size:14px;line-height:1.35}
+.tr-card .km{font-size:12px;font-variant-numeric:tabular-nums;color:var(--teal);white-space:nowrap}
+.tr-card .sub{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.tr-card .sub2{font-size:10.5px;color:#8fa3ad;margin-top:4px;line-height:1.55;opacity:.9}
+.tr-card .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.tr-card .acts button{font:inherit;font-size:11px;border:1px solid rgba(84,216,196,.4);
+  background:rgba(84,216,196,.08);color:var(--teal);border-radius:8px;padding:5px 10px;cursor:pointer}
+.tr-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
+  border-top:1px dashed var(--line);padding-top:10px}
+
+/* ---------- Cafe 清單 ---------- */
+.cf-search{display:flex;gap:8px;margin:4px 0;flex-wrap:wrap}
 .cf-search input,.cf-search select{
   font:inherit;font-size:12.5px;padding:8px 11px;border-radius:9px;
   border:1px solid var(--line);background:#111a22;color:var(--ink);
@@ -187,10 +243,7 @@ body{overflow:hidden;height:100vh}
 .cf-search input{flex:1;min-width:150px}
 .cf-count{font-size:11px;color:var(--dim);margin:6px 0 10px}
 .cf-list{display:flex;flex-direction:column;gap:9px}
-.cf-card{
-  background:var(--card);border:1px solid var(--line);border-radius:13px;
-  padding:12px 13px;
-}
+.cf-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
 .cf-head{display:flex;align-items:flex-start;gap:9px}
 .cf-mono{
   width:34px;height:34px;border-radius:9px;flex:none;
@@ -213,42 +266,6 @@ body{overflow:hidden;height:100vh}
 .cf-more{display:block;margin:14px auto 0;font:inherit;font-size:12px;padding:9px 18px;
   border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--dim);cursor:pointer}
 .cf-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
-  border-top:1px dashed var(--line);padding-top:10px}
-
-/* ---------- 山徑 tab ---------- */
-#p-trail{padding-top:var(--tabh);height:100vh;overflow-y:auto;overflow-x:hidden;background:var(--bg)}
-.tr-mapwrap{position:relative;height:44vh;min-height:250px;background:#070a10}
-#tmap{position:absolute;inset:0}
-.tr-hud{top:10px!important}
-.tr-tools{bottom:12px!important}
-.tr-legend{bottom:12px!important}
-.tr-body{max-width:640px;margin:0 auto;padding:14px 16px 40px}
-.tr-head h2{font-size:17px;margin:0 0 4px;letter-spacing:.02em}
-.tr-head p{font-size:11.5px;color:var(--dim);margin:0;line-height:1.6}
-.tr-q{width:100%;margin:12px 0 6px;font:inherit;font-size:12.5px;padding:9px 12px;
-  border-radius:9px;border:1px solid var(--line);background:#111a22;color:var(--ink)}
-.tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
-.tr-levels::-webkit-scrollbar{display:none}
-.tr-levels button{font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
-  border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;white-space:nowrap}
-.tr-levels button[aria-pressed="true"]{color:var(--ink);background:rgba(255,255,255,.06)}
-.lv{display:inline-block;font-size:10px;line-height:1.5;padding:1px 7px;border-radius:6px;
-  border:1px solid currentColor;margin-right:6px;vertical-align:1px}
-.tr-count{font-size:11px;color:var(--dim);margin:2px 0 10px}
-.tr-list{display:flex;flex-direction:column;gap:8px}
-.tr-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
-.tr-card.sel{border-color:rgba(197,140,255,.55);background:rgba(197,140,255,.06)}
-.tr-card .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.tr-card h3{margin:0;font-size:14px;line-height:1.35}
-.tr-card .km{font-size:12px;font-variant-numeric:tabular-nums;color:var(--teal);white-space:nowrap}
-.tr-card .sub{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.5}
-.tr-card .sub2{font-size:10.5px;color:#8fa3ad;margin-top:4px;line-height:1.55;opacity:.9}
-.tr-card .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-.tr-card .acts button,.tr-card .acts a{font:inherit;font-size:11px;text-decoration:none;
-  border:1px solid rgba(84,216,196,.4);background:rgba(84,216,196,.08);color:var(--teal);
-  border-radius:8px;padding:5px 10px;cursor:pointer}
-.tr-card .acts a{border-color:var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
-.tr-note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:14px;
   border-top:1px dashed var(--line);padding-top:10px}
 
 /* ---------- popup ---------- */
@@ -277,6 +294,8 @@ body{overflow:hidden;height:100vh}
   .pk-search{width:calc(100% - 20px);right:10px;top:calc(var(--tabh) + 56px)}
   .pk-legend{display:none}
   .pk-hud .pk-chip:nth-child(4){display:none}
+  .pk-tools{max-width:calc(100% - 20px)}
+  .sheet{height:82vh}
 }
 
 </style>
@@ -284,9 +303,7 @@ body{overflow:hidden;height:100vh}
 <body>
 <nav class="tabbar" role="tablist" aria-label="頁面分頁">
   <button role="tab" id="tab-now" aria-selected="true" aria-controls="p-now">即時</button>
-  <button role="tab" id="tab-park" aria-selected="false" aria-controls="p-park">泊車</button>
-  <button role="tab" id="tab-trail" aria-selected="false" aria-controls="p-trail">山徑</button>
-  <button role="tab" id="tab-cafe" aria-selected="false" aria-controls="p-cafe">Cafe</button>
+  <button role="tab" id="tab-map" aria-selected="false" aria-controls="p-park">地圖</button>
   <span class="sp"></span>
   <span class="live" id="tab-live"></span>
 </nav>
@@ -697,7 +714,7 @@ loadRadar();
 setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
 setInterval(loadRadar, 720000);
 </script>
-<section class="tabpage" id="p-park" role="tabpanel" aria-labelledby="tab-park">
+<section class="tabpage" id="p-park" role="tabpanel" aria-labelledby="tab-map">
   <div id="map"></div>
 
   <div class="pk-hud">
@@ -708,15 +725,19 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-search">
-    <input id="q" type="search" placeholder="車場／街道／地區，例如 中環">
+    <input id="q" type="search" placeholder="車場／街道／Cafe／山徑，例如 中環">
     <div class="pk-results" id="results"></div>
   </div>
 
-  <div class="pk-tools">
+  <div class="pk-tools" id="layer-tools">
     <button id="tg-parks" aria-pressed="true">停車場</button>
-    <button id="tg-meters" aria-pressed="true">感應咪錶位</button>
+    <button id="tg-meters" aria-pressed="true">感應咪錶</button>
     <button id="tg-cafes" aria-pressed="false">Cafe</button>
+    <button id="tg-trails" aria-pressed="false">遠足徑</button>
+    <button id="tg-posts" aria-pressed="false">標距柱</button>
     <button id="tg-free" aria-pressed="false">只看有空位</button>
+    <button id="open-trail" class="pk-list">山徑 167 段</button>
+    <button id="open-cafe" class="pk-list">Cafe 446 間</button>
   </div>
 
   <div class="pk-legend">
@@ -731,39 +752,15 @@ setInterval(loadRadar, 720000);
   </div>
 </section>
 
-<section class="tabpage" id="p-trail" role="tabpanel" aria-labelledby="tab-trail">
-  <div class="tr-mapwrap">
-    <div id="tmap"></div>
-    <div class="pk-hud tr-hud">
-      <div class="pk-chip"><i>路線</i><b class="g" id="tr-n">—</b></div>
-      <div class="pk-chip"><i>標距柱</i><b class="y" id="tr-p">—</b></div>
-      <div class="pk-chip"><i>合計長度</i><b id="tr-km">—</b></div>
-    </div>
-    <div class="pk-tools tr-tools">
-      <button id="tr-tg-lines" aria-pressed="true">路線</button>
-      <button id="tr-tg-posts" aria-pressed="true">標距柱</button>
-      <button id="tr-fit">全港視圖</button>
-    </div>
-    <div class="pk-legend tr-legend">
-      <span class="h">圖例</span>
-      <s style="background:#54d8c4"></s>易行<br>
-      <s style="background:#ffd166"></s>普通<br>
-      <s style="background:#ff9f43"></s>費力<br>
-      <s style="background:#ff6b78"></s>難行<br>
-      <s style="background:#ff4d8d"></s>非常難行<br>
-      <s style="background:#3a4757"></s>未列入<br>
-      <s style="background:#ffd166"></s>標距柱（zoom ≥ 12）<br>
-      <s style="background:#c58cff"></s>已選路線
-    </div>
+<section class="sheet" id="p-trail">
+  <div class="sheet-head">
+    <h2>郊野公園遠足徑</h2>
+    <button class="sheet-close" data-close="p-trail">收起</button>
   </div>
-
-  <div class="tr-body">
-    <div class="tr-head">
-      <h2>郊野公園遠足徑</h2>
-      <p id="tr-sub">載入中…</p>
-    </div>
-    <input id="tr-q" type="search" class="tr-q" placeholder="路線名，例如 麥理浩徑 / 衛奕信徑 / 家樂徑">
+  <div class="inner">
+    <p class="sheet-sub" id="tr-sub">載入中…</p>
     <div class="tr-levels" id="tr-levels"></div>
+    <input id="tr-q" type="search" class="tr-q" placeholder="路線名／地區／起點，例如 麥理浩徑">
     <div class="tr-count" id="tr-count"></div>
     <div class="tr-list" id="tr-list"></div>
     <div class="tr-note">
@@ -774,12 +771,13 @@ setInterval(loadRadar, 720000);
   </div>
 </section>
 
-<section class="tabpage" id="p-cafe" role="tabpanel" aria-labelledby="tab-cafe">
-  <div class="cf-wrap">
-    <div class="cf-top">
-      <h2>香港手沖咖啡地圖</h2>
-      <p id="cf-sub">載入中…</p>
-    </div>
+<section class="sheet" id="p-cafe">
+  <div class="sheet-head">
+    <h2>香港手沖咖啡地圖</h2>
+    <button class="sheet-close" data-close="p-cafe">收起</button>
+  </div>
+  <div class="inner">
+    <p class="sheet-sub" id="cf-sub">載入中…</p>
     <div class="cf-search">
       <input id="cf-q" type="search" placeholder="店名／街道／地區">
       <select id="cf-dist"><option value="">全部地區</option></select>
@@ -795,17 +793,23 @@ setInterval(loadRadar, 720000);
 </section>
 <script src="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-/* ===== 整合 tab / 泊車地圖 / Cafe 清單 ===== */
+/* ===== 單一地圖頁：泊車 / Cafe / 山徑 以左下角開關控制圖層，清單用底部面板 ===== */
 (function(){
   "use strict";
 
-  var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], pm:{}, mm:{}, cm:{}, trailMeta:{}, map:null, booted:false };
-  var TM = { map:null, booted:false, loaded:false, loading:false, hl:-1, lv:"", tg:{lines:true, posts:true} };
+  var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], pm:{}, mm:{}, cm:{}, tm:{}, map:null, booted:false };
+  var TG = { parks:true, meters:true, cafes:false, trails:false, posts:false, free:false };
+  var HL = -1;
+  var LVC = {"易行":"#54d8c4","普通":"#ffd166","費力":"#ff9f43","難行":"#ff6b78",
+             "非常難行":"#ff4d8d","未列入":"#3a4757"};
+  var LVORDER = ["易行","普通","費力","難行","非常難行","未列入"];
+
   var esc = function(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   };
+  var num = function(n){ return Number(n).toLocaleString(); };
   var valColor = function(v){
     if (v < 0) return "#3a4757";
     if (v >= 20) return "#54d8c4";
@@ -815,10 +819,9 @@ setInterval(loadRadar, 720000);
   };
   var parkColorExpr = ["case", ["<", ["get","v"], 0], "#3a4757",
       ["step", ["get","v"], "#ff6b78", 1, "#ff9f43", 5, "#ffd166", 20, "#54d8c4"]];
-  var num = function(n){ return Number(n).toLocaleString(); };
 
   /* ---------- tabs ---------- */
-  var TABS = [["tab-now","p-now"],["tab-park","p-park"],["tab-trail","p-trail"],["tab-cafe","p-cafe"]];
+  var TABS = [["tab-now","p-now"],["tab-map","p-park"]];
   function showTab(key){
     TABS.forEach(function(t){
       var btn = document.getElementById(t[0]);
@@ -827,22 +830,27 @@ setInterval(loadRadar, 720000);
       btn.setAttribute("aria-selected", on ? "true" : "false");
       page.classList.toggle("on", on);
     });
-    if (key === "tab-park") {
+    if (key === "tab-map") {
       bootMap();
       setTimeout(function(){ if (ST.map) ST.map.resize(); }, 60);
     }
-    if (key === "tab-trail") {
-      bootTrailMap();
-      ensureTrails();
-      setTimeout(function(){ if (TM.map) TM.map.resize(); }, 60);
-    }
-    try { history.replaceState(null, "", "#" + key.replace("tab-","")); } catch(e){}
   }
   TABS.forEach(function(t){
     document.getElementById(t[0]).addEventListener("click", function(){ showTab(t[0]); });
   });
-  var hash = (location.hash || "").replace("#","");
-  /* hash 導向延後到 DOMContentLoaded 執行，確保 MAP_STYLE 已初始化 */
+
+  /* ---------- sheets ---------- */
+  function openSheet(id){
+    document.getElementById(id).classList.add("on");
+  }
+  function closeSheet(id){
+    document.getElementById(id).classList.remove("on");
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".sheet-close"), function(b){
+    b.addEventListener("click", function(){ closeSheet(b.getAttribute("data-close")); });
+  });
+  document.getElementById("open-trail").addEventListener("click", function(){ openSheet("p-trail"); });
+  document.getElementById("open-cafe").addEventListener("click", function(){ openSheet("p-cafe"); });
 
   /* ---------- map ---------- */
   var MAP_STYLE = {
@@ -850,11 +858,8 @@ setInterval(loadRadar, 720000);
     sources: {
       base: {
         type: "raster",
-        tiles: [
-          "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        ],
-        tileSize: 256,
-        maxzoom: 19,
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize: 256, maxzoom: 19,
         attribution: "© OpenStreetMap contributors"
       }
     },
@@ -871,8 +876,7 @@ setInterval(loadRadar, 720000);
     if (ST.booted || !window.maplibregl) return;
     ST.booted = true;
     var map = new maplibregl.Map({
-      container: "map",
-      style: MAP_STYLE,
+      container: "map", style: MAP_STYLE,
       center: [114.168, 22.336], zoom: 10.8, minZoom: 9, maxZoom: 18,
       attributionControl: false
     });
@@ -892,6 +896,34 @@ setInterval(loadRadar, 720000);
       setTimeout(function(){ map.__drawPending = false; drawLayers(map); }, 200);
       return;
     }
+
+    map.addSource("trails", {type:"geojson", data: trailsFC()});
+    map.addLayer({
+      id:"trail-line", type:"line", source:"trails",
+      paint:{
+        "line-color":["match",["get","lv"],"易行","#54d8c4","普通","#ffd166","費力","#ff9f43",
+                      "難行","#ff6b78","非常難行","#ff4d8d","#3a4757"],
+        "line-opacity":["interpolate",["linear"],["zoom"],9,.35,13,.6,16,.78],
+        "line-width":["interpolate",["linear"],["zoom"],9,0.8,12,1.6,15,2.6,18,4]
+      }
+    });
+
+    map.addSource("trail-hl", {type:"geojson", data: hlFC(-1)});
+    map.addLayer({
+      id:"trail-hl", type:"line", source:"trail-hl",
+      paint:{"line-color":"#c58cff", "line-width":["interpolate",["linear"],["zoom"],10,2.2,16,5.5],
+             "line-opacity":.95}
+    });
+
+    map.addSource("posts", {type:"geojson", data: postsFC()});
+    map.addLayer({
+      id:"post-dot", type:"circle", source:"posts", minzoom:11,
+      paint:{
+        "circle-radius":["interpolate",["linear"],["zoom"],11,2.2,17,6],
+        "circle-color":"#ffd166",
+        "circle-stroke-width":1, "circle-stroke-color":"rgba(7,10,16,.85)"
+      }
+    });
 
     map.addSource("parks", {type:"geojson", data: parksFC()});
     map.addLayer({
@@ -921,7 +953,7 @@ setInterval(loadRadar, 720000);
 
     map.addSource("cafes", {type:"geojson", data: cafesFC()});
     map.addLayer({
-      id:"cafe-dot", type:"circle", source:"cafes", minzoom:11,
+      id:"cafe-dot", type:"circle", source:"cafes", minzoom:10,
       layout:{"visibility":"none"},
       paint:{
         "circle-radius":["interpolate",["linear"],["zoom"],11,3,16,6],
@@ -932,13 +964,14 @@ setInterval(loadRadar, 720000);
 
     map.on("click","park-dot", function(e){ parkPopup(e); });
     map.on("click","meter-dot", function(e){ meterPopup(e); });
-    map.on("click","cafe-dot", function(e){ cafePopup(e, map); });
-    ["park-dot","meter-dot","cafe-dot"].forEach(function(id){
+    map.on("click","cafe-dot", function(e){ cafePopup(e); });
+    map.on("click","post-dot", function(e){ postPopup(e); });
+    map.on("click","trail-line", function(e){ trailPopup(e); });
+    ["park-dot","meter-dot","cafe-dot","post-dot","trail-line"].forEach(function(id){
       map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
     });
 
-    /* 若資料比地圖樣式更早到，補回一次資料注入 */
     syncLayers(map);
   }
 
@@ -947,6 +980,8 @@ setInterval(loadRadar, 720000);
     if (ST.parks.length) map.getSource("parks").setData(parksFC());
     if (ST.meters.length) map.getSource("meters").setData(metersFC());
     if (ST.cafes.length) map.getSource("cafes").setData(cafesFC());
+    if (ST.trails.length) map.getSource("trails").setData(trailsFC());
+    if (ST.posts.length) map.getSource("posts").setData(postsFC());
     applyToggles();
   }
 
@@ -965,8 +1000,31 @@ setInterval(loadRadar, 720000);
   function cafesFC(){
     return {type:"FeatureCollection", features:(ST.cafes||[]).map(function(c){
       return {type:"Feature", geometry:{type:"Point", coordinates:[c.lo,c.la]},
-        properties:{n:c.n, a:c.a, d:c.d, h:c.h, x:c.x, u:c.u, t:c.t}};
+        properties:{n:c.n, a:c.a, d:c.d, h:c.h, x:c.x, u:c.u, t:c.t, s:c.s}};
     })};
+  }
+  function trailsFC(){
+    return {type:"FeatureCollection", features:(ST.trails||[]).map(function(t,i){
+      return {type:"Feature",
+        geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
+          return l.map(function(p){ return [p[1], p[0]]; });
+        })},
+        properties:{i:i, n:t.n, e:t.e, len:t.len, lv:t.lv, ty:t.ty, sp:t.sp, ep:t.ep}};
+    })};
+  }
+  function postsFC(){
+    return {type:"FeatureCollection", features:(ST.posts||[]).map(function(p){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[p[3], p[2]]},
+        properties:{id:p[0], t:p[1]}};
+    })};
+  }
+  function hlFC(i){
+    if (i < 0 || !ST.trails[i]) return {type:"FeatureCollection", features:[]};
+    var t = ST.trails[i];
+    return {type:"FeatureCollection", features:[{type:"Feature",
+      geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
+        return l.map(function(p){ return [p[1], p[0]]; });
+      })}, properties:{i:i}}]};
   }
 
   function parkPopup(e){
@@ -974,8 +1032,7 @@ setInterval(loadRadar, 720000);
     var lnglat = e.features[0].geometry.coordinates;
     var v = Number(p.v);
     var tag = v < 0 ? "今次無實時讀數" : v > 0 ? "有空位" : "已滿";
-    new maplibregl.Popup({maxWidth:"300px"})
-      .setLngLat(lnglat)
+    new maplibregl.Popup({maxWidth:"300px"}).setLngLat(lnglat)
       .setHTML('<div class="pp"><h4>'+esc(p.n)+'</h4>'
         + '<div class="sub">'+esc(p.d)+(p.a ? " · "+esc(p.a) : "")+'</div>'
         + '<div class="row"><span>私家車空位</span><span class="big" style="color:'+valColor(v)+'">'
@@ -1000,7 +1057,7 @@ setInterval(loadRadar, 720000);
       .addTo(ST.map);
   }
 
-  function cafePopup(e, map){
+  function cafePopup(e){
     var c = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
     new maplibregl.Popup({maxWidth:"310px"}).setLngLat(lnglat)
       .setHTML('<div class="pp"><h4>'+esc(c.n)+'</h4>'
@@ -1010,26 +1067,47 @@ setInterval(loadRadar, 720000);
         + '<div class="x" style="margin-top:8px;color:#b9c7cb;font-size:11.5px;line-height:1.6">'+esc(c.x||"")+'</div>'
         + '<a href="'+esc(c.u)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;'
         + 'font-size:11px;color:#54d8c4">查看原始頁面 →</a></div>')
-      .addTo(map);
+      .addTo(ST.map);
+  }
+
+  function postPopup(e){
+    var q = e.features[0].properties;
+    new maplibregl.Popup({maxWidth:"240px"}).setLngLat(e.features[0].geometry.coordinates)
+      .setHTML('<div class="pp"><h4>標距柱 '+esc(q.id)+'</h4>'
+        + '<div class="sub">'+esc(q.t||"")+'</div>'
+        + '<div class="row"><span>資料</span><span>漁護署</span></div></div>').addTo(ST.map);
+  }
+
+  function trailPopup(e){
+    var q = e.features[0].properties;
+    selectTrail(Number(q.i), false);
+    new maplibregl.Popup({maxWidth:"290px"}).setLngLat(e.lngLat)
+      .setHTML('<div class="pp"><h4>'+esc(q.n||q.e)+'</h4>'
+        + '<div class="sub">'+esc([q.ty, q.lv].filter(Boolean).join(" · "))+'</div>'
+        + (q.sp && q.ep ? '<div class="row"><span>路線</span><span>'+esc(q.sp)+' → '+esc(q.ep)+'</span></div>' : "")
+        + '<div class="row"><span>官方長度</span><span>'+q.len+' km</span></div></div>')
+      .addTo(ST.map);
   }
 
   /* ---------- toggles ---------- */
-  var tg = {parks:true, meters:true, cafes:false, free:false};
   function applyToggles(){
     var map = ST.map;
     if (!map || !map.getLayer("park-dot")) return;
     var vis = function(id, on){ map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); };
-    vis("park-halo", tg.parks); vis("park-dot", tg.parks);
-    vis("meter-dot", tg.meters); vis("cafe-dot", tg.cafes);
-    var f = tg.free ? [">=",["get","v"],3] : null;
+    vis("park-halo", TG.parks); vis("park-dot", TG.parks);
+    vis("meter-dot", TG.meters); vis("cafe-dot", TG.cafes);
+    vis("trail-line", TG.trails); vis("trail-hl", TG.trails);
+    vis("post-dot", TG.trails && TG.posts);
+    var f = TG.free ? [">=",["get","v"],3] : null;
     map.setFilter("park-dot", f); map.setFilter("park-halo", f);
   }
-  [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],["tg-free","free"]].forEach(function(pair){
+  [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],
+   ["tg-trails","trails"],["tg-posts","posts"],["tg-free","free"]].forEach(function(pair){
     var b = document.getElementById(pair[0]);
-    b.setAttribute("aria-pressed", tg[pair[1]]);
+    b.setAttribute("aria-pressed", TG[pair[1]]);
     b.addEventListener("click", function(){
-      tg[pair[1]] = !tg[pair[1]];
-      b.setAttribute("aria-pressed", tg[pair[1]]);
+      TG[pair[1]] = !TG[pair[1]];
+      b.setAttribute("aria-pressed", TG[pair[1]]);
       applyToggles();
     });
   });
@@ -1049,12 +1127,19 @@ setInterval(loadRadar, 720000);
       });
       ST.cafes.forEach(function(c){
         if (((c.n+" "+c.d+" "+c.a)||"").toLowerCase().indexOf(v) >= 0)
-          hits.push({t:c.n, s:"Cafe · "+(c.d||"")+(c.h?" · "+c.h:""), la:c.la, lo:c.lo, z:16});
+          hits.push({t:c.n, s:"Cafe · "+(c.d||"")+(c.h?" · "+c.h:""), la:c.la, lo:c.lo, z:16,
+                     on:function(){ TG.cafes = true; setBtn("tg-cafes", true); }});
       });
       ST.meters.forEach(function(m){
         if (m[3] !== 0) return;
         if (((m[4]+" "+m[5])||"").toLowerCase().indexOf(v) >= 0)
           hits.push({t:m[4], s:"空置咪錶位 "+m[0]+" · "+(m[5]||""), la:m[1], lo:m[2], z:17});
+      });
+      ST.trails.forEach(function(t){
+        if (((t.n+" "+t.e+" "+(t.ty||"")+" "+(t.rg||"")+" "+(t.sp||"")+" "+(t.ep||"")+" "+(t.lv||""))||"")
+            .toLowerCase().indexOf(v) >= 0)
+          hits.push({t:t.n, s:"山徑 · "+t.lv+" · "+t.len+" km", bounds:t.lines, z:14,
+                     on:function(){ TG.trails = true; setBtn("tg-trails", true); }});
       });
       if (!hits.length){ box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>'; return; }
       hits.slice(0,8).forEach(function(h){
@@ -1063,28 +1148,113 @@ setInterval(loadRadar, 720000);
         el.innerHTML = "<b>"+esc(h.t)+"</b><span>"+esc(h.s)+"</span>";
         el.addEventListener("click", function(){
           if (!ST.map) return;
-          ST.map.flyTo({center:[h.lo,h.la], zoom:h.z, duration:900});
+          if (h.on) { h.on(); applyToggles(); }
+          if (h.bounds) flyToTrail(h.bounds);
+          else ST.map.flyTo({center:[h.lo,h.la], zoom:h.z, duration:900});
         });
         box.appendChild(el);
       });
     });
   }
+  function setBtn(id, on){
+    var b = document.getElementById(id);
+    if (b) b.setAttribute("aria-pressed", on);
+  }
+
+  function flyToTrail(lines){
+    if (!ST.map || !lines) return;
+    var b = new maplibregl.LngLatBounds();
+    lines.forEach(function(l){ l.forEach(function(p){ b.extend([p[1], p[0]]); }); });
+    ST.map.fitBounds(b, {padding:{top:90,bottom:110,left:40,right:40}, maxZoom:15, duration:700});
+  }
+
+  /* ---------- trail list ---------- */
+  var TL = { lv:"", sel:-1 };
+  function renderLevels(){
+    var box = document.getElementById("tr-levels");
+    var rows = LVORDER.map(function(l){
+      var n = ST.trails.filter(function(t){ return t.lv === l; }).length;
+      if (!n) return "";
+      var c = LVC[l] || "#8fa3ad";
+      var on = TL.lv === l;
+      return '<button data-lv="'+l+'" aria-pressed="'+on+'" style="'
+        + (on ? "color:"+c+";border-color:"+c : "") + '">'+l+' '+n+'</button>';
+    }).join("");
+    box.innerHTML = '<button data-lv="" aria-pressed="'+(TL.lv === "" ? "true" : "false")+'">全部</button>' + rows;
+    Array.prototype.forEach.call(box.querySelectorAll("button"), function(b){
+      b.addEventListener("click", function(){
+        TL.lv = b.getAttribute("data-lv");
+        renderLevels(); renderTrails();
+      });
+    });
+  }
+
+  function selectTrail(i, fly){
+    if (!ST.trails[i]) return;
+    TL.sel = i;
+    if (ST.map && ST.map.getSource("trail-hl")) ST.map.getSource("trail-hl").setData(hlFC(i));
+    Array.prototype.forEach.call(document.querySelectorAll(".tr-card"), function(c){
+      c.classList.toggle("sel", Number(c.getAttribute("data-i")) === i);
+    });
+    if (fly) flyToTrail(ST.trails[i].lines);
+  }
+
+  function renderTrails(){
+    var list = document.getElementById("tr-list");
+    var q = (document.getElementById("tr-q").value || "").trim().toLowerCase();
+    var rows = ST.trails.map(function(t,i){ return {t:t, i:i}; }).filter(function(r){
+      if (TL.lv && r.t.lv !== TL.lv) return false;
+      if (!q) return true;
+      return ((r.t.n + " " + r.t.e + " " + (r.t.ty||"") + " " + (r.t.rg||"") + " " +
+              (r.t.sp||"") + " " + (r.t.ep||"") + " " + (r.t.lv||"")) || "").toLowerCase().indexOf(q) >= 0;
+    });
+    document.getElementById("tr-count").textContent =
+      (q || TL.lv ? "符合 " : "共 ") + rows.length + " 段路線"
+      + (TL.lv ? "（" + TL.lv + "）" : "") + (q ? "" : "，依官方長度排序");
+    if (!rows.length) { list.innerHTML = '<div class="tr-card"><div class="sub">冇匹配路線</div></div>'; return; }
+    list.innerHTML = rows.map(function(r){
+      var t = r.t;
+      var c = LVC[t.lv] || "#8fa3ad";
+      var meta = [t.ty, t.rg].filter(Boolean).join(" · ");
+      var route = t.sp && t.ep ? (t.sp + " → " + t.ep) : "";
+      return '<div class="tr-card'+(TL.sel === r.i ? " sel" : "")+'" data-i="'+r.i+'">'
+        + '<div class="t"><h3>'+esc(t.n || t.e)+'</h3><span class="km">'+t.len+' km</span></div>'
+        + '<div class="sub"><span class="lv" style="color:'+c+'">'+esc(t.lv)+'</span>'+esc(t.e || "")+'</div>'
+        + (meta || route ? '<div class="sub2">'+esc([meta, route].filter(Boolean).join(" · "))+'</div>' : "")
+        + '<div class="acts"><button data-fly="'+r.i+'">在地圖看</button></div>'
+        + "</div>";
+    }).join("");
+    Array.prototype.forEach.call(list.querySelectorAll("button[data-fly]"), function(b){
+      b.addEventListener("click", function(){
+        var i = Number(b.getAttribute("data-fly"));
+        TG.trails = true; setBtn("tg-trails", true);
+        if (ST.map) ST.map.resize();
+        applyToggles();
+        closeSheet("p-trail");
+        selectTrail(i, true);
+      });
+    });
+  }
+
+  function wireTrailUI(){
+    document.getElementById("tr-q").addEventListener("input", renderTrails);
+  }
 
   /* ---------- cafe list ---------- */
-  var cf = {q:"", dist:"", shown:0, size:24, rows:[]};
+  var CF = {q:"", dist:"", shown:0, size:24, rows:[]};
   function renderCafes(){
     var list = document.getElementById("cf-list");
     var cnt = document.getElementById("cf-count");
     var more = document.getElementById("cf-more");
-    var v = cf.q.trim().toLowerCase();
-    cf.rows = ST.cafes.filter(function(c){
-      if (cf.dist && c.d !== cf.dist) return false;
+    var v = CF.q.trim().toLowerCase();
+    CF.rows = ST.cafes.filter(function(c){
+      if (CF.dist && c.d !== CF.dist) return false;
       if (!v) return true;
       return ((c.n+" "+c.a+" "+c.d)||"").toLowerCase().indexOf(v) >= 0;
     });
-    cnt.textContent = "共 " + cf.rows.length + " 間" + (cf.dist ? "（" + cf.dist + "）" : "");
-    var slice = cf.rows.slice(0, cf.shown + cf.size);
-    cf.shown = slice.length;
+    cnt.textContent = "共 " + CF.rows.length + " 間" + (CF.dist ? "（" + CF.dist + "）" : "");
+    var slice = CF.rows.slice(0, CF.shown + CF.size);
+    CF.shown = slice.length;
     list.innerHTML = slice.map(function(c){
       var mono = esc((c.n||"?").trim().charAt(0));
       return '<div class="cf-card">'
@@ -1099,286 +1269,29 @@ setInterval(loadRadar, 720000);
         + '<a href="'+esc(c.u)+'" target="_blank" rel="noopener">原站</a>'
         + "</div></div>";
     }).join("");
-    more.style.display = cf.shown < cf.rows.length ? "block" : "none";
+    more.style.display = CF.shown < CF.rows.length ? "block" : "none";
     Array.prototype.forEach.call(list.querySelectorAll("button[data-i]"), function(b){
       b.addEventListener("click", function(){
         var slug = b.getAttribute("data-i");
         var c = ST.cafes.filter(function(x){ return x.s === slug; })[0];
         if (!c) return;
-        showTab("tab-park");
-        tg.cafes = true;
-        document.getElementById("tg-cafes").setAttribute("aria-pressed", "true");
-        setTimeout(function(){
-          if (!ST.map) return;
-          applyToggles();
-          ST.map.resize();
-          ST.map.flyTo({center:[c.lo, c.la], zoom:16.4, duration:900});
-        }, 140);
+        TG.cafes = true; setBtn("tg-cafes", true);
+        if (ST.map) ST.map.resize();
+        applyToggles();
+        closeSheet("p-cafe");
+        ST.map.flyTo({center:[c.lo, c.la], zoom:16.4, duration:900});
       });
     });
   }
   function wireCafeUI(){
     document.getElementById("cf-q").addEventListener("input", function(){
-      cf.q = this.value; cf.shown = 0; renderCafes();
+      CF.q = this.value; CF.shown = 0; renderCafes();
     });
     document.getElementById("cf-dist").addEventListener("change", function(){
-      cf.dist = this.value; cf.shown = 0; renderCafes();
+      CF.dist = this.value; CF.shown = 0; renderCafes();
     });
     document.getElementById("cf-more").addEventListener("click", function(){
-      cf.size += 24; cf.shown = cf.shown; renderCafes();
-    });
-  }
-
-  /* ---------- 山徑 map ---------- */
-  var LVC = {"易行":"#54d8c4","普通":"#ffd166","費力":"#ff9f43","難行":"#ff6b78",
-             "非常難行":"#ff4d8d","未列入":"#8fa3ad"};
-  var LVORDER = ["易行","普通","費力","難行","非常難行","未列入"];
-
-  function renderLevels(){
-    var box = document.getElementById("tr-levels");
-    var rows = LVORDER.map(function(l){
-      var n = ST.trails.filter(function(t){ return t.lv === l; }).length;
-      if (!n) return "";
-      var c = LVC[l] || "#8fa3ad";
-      var on = TM.lv === l;
-      return '<button data-lv="'+l+'" aria-pressed="'+on+'" style="color:'+(on ? c : "")+
-        ';border-color:'+(on ? c : "")+'">'+l+' '+n+'</button>';
-    }).join("");
-    box.innerHTML = '<button data-lv="" aria-pressed="'+(TM.lv === "" ? "true" : "false")+'">全部</button>' + rows;
-    Array.prototype.forEach.call(box.querySelectorAll("button"), function(b){
-      b.addEventListener("click", function(){
-        TM.lv = b.getAttribute("data-lv");
-        renderLevels(); renderTrails();
-      });
-    });
-  }
-
-  function bootTrailMap(){
-    if (TM.booted || !window.maplibregl) return;
-    TM.booted = true;
-    var map = new maplibregl.Map({
-      container: "tmap",
-      style: MAP_STYLE,
-      center: [114.16, 22.38], zoom: 11.2, minZoom: 9, maxZoom: 18,
-      attributionControl: false
-    });
-    map.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-left");
-    map.addControl(new maplibregl.AttributionControl({compact:true}), "bottom-left");
-    map.on("style.load", function(){ drawTrailLayers(map); });
-    map.on("load", function(){ drawTrailLayers(map); });
-    TM.map = map;
-  }
-
-  function trailsFC(){
-    return {type:"FeatureCollection", features:(ST.trails||[]).map(function(t,i){
-      return {type:"Feature",
-        geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
-          return l.map(function(p){ return [p[1], p[0]]; });
-        })},
-        properties:{i:i, n:t.n, e:t.e, len:t.len, lv:t.lv}};
-    })};
-  }
-  function postsFC(){
-    return {type:"FeatureCollection", features:(ST.posts||[]).map(function(p){
-      return {type:"Feature", geometry:{type:"Point", coordinates:[p[3], p[2]]},
-        properties:{id:p[0], t:p[1]}};
-    })};
-  }
-  function hlFC(i){
-    if (i < 0) return {type:"FeatureCollection", features:[]};
-    var t = ST.trails[i];
-    if (!t) return {type:"FeatureCollection", features:[]};
-    return {type:"FeatureCollection", features:[{type:"Feature",
-      geometry:{type:"MultiLineString", coordinates:t.lines.map(function(l){
-        return l.map(function(p){ return [p[1], p[0]]; });
-      })},
-      properties:{i:i}}]};
-  }
-
-  function drawTrailLayers(map){
-    if (map.getSource("trails")) { syncTrailLayers(map); return; }
-    if (!map.isStyleLoaded()) {
-      if (map.__tpending) return;
-      map.__tpending = true;
-      setTimeout(function(){ map.__tpending = false; drawTrailLayers(map); }, 200);
-      return;
-    }
-
-    map.addSource("trails", {type:"geojson", data: trailsFC()});
-    map.addLayer({
-      id:"trail-line", type:"line", source:"trails",
-      paint:{
-        "line-color":["match",["get","lv"],"易行","#54d8c4","普通","#ffd166","費力","#ff9f43",
-                      "難行","#ff6b78","非常難行","#ff4d8d","#3a4757"],
-        "line-opacity":["interpolate",["linear"],["zoom"],9,.35,13,.6,16,.78],
-        "line-width":["interpolate",["linear"],["zoom"],9,0.8,12,1.6,15,2.6,18,4]
-      }
-    });
-
-    map.addSource("trail-hl", {type:"geojson", data: hlFC(-1)});
-    map.addLayer({
-      id:"trail-hl", type:"line", source:"trail-hl",
-      paint:{"line-color":"#c58cff", "line-width":["interpolate",["linear"],["zoom"],10,2.2,16,5.5],
-             "line-opacity":.95}
-    });
-
-    map.addSource("posts", {type:"geojson", data: postsFC()});
-    map.addLayer({
-      id:"post-dot", type:"circle", source:"posts", minzoom:12,
-      paint:{
-        "circle-radius":["interpolate",["linear"],["zoom"],12,2.6,17,6],
-        "circle-color":"#ffd166",
-        "circle-stroke-width":1, "circle-stroke-color":"rgba(7,10,16,.85)"
-      }
-    });
-
-    map.on("click","post-dot", function(e){
-      var q = e.features[0].properties;
-      new maplibregl.Popup({maxWidth:"240px"}).setLngLat(e.features[0].geometry.coordinates)
-        .setHTML('<div class="pp"><h4>標距柱 '+esc(q.id)+'</h4>'
-          + '<div class="sub">'+esc(q.t||"")+'</div>'
-          + '<div class="row"><span>資料</span><span>漁護署</span></div></div>').addTo(TM.map);
-    });
-    map.on("click","trail-line", function(e){
-      var q = e.features[0].properties;
-      selectTrail(Number(q.i), false);
-      new maplibregl.Popup({maxWidth:"280px"}).setLngLat(e.lngLat)
-        .setHTML('<div class="pp"><h4>'+esc(q.n||q.e)+'</h4>'
-          + '<div class="sub">'+esc(q.e||"")+'</div>'
-          + '<div class="row"><span>約長</span><span>'+q.len+' km</span></div></div>')
-        .addTo(TM.map);
-    });
-    ["trail-line","post-dot"].forEach(function(id){
-      map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
-    });
-
-    syncTrailLayers(map);
-  }
-
-  function syncTrailLayers(map){
-    if (!map || !map.getSource("trails")) return;
-    if (ST.trails.length) map.getSource("trails").setData(trailsFC());
-    if (ST.posts.length) map.getSource("posts").setData(postsFC());
-    applyTrailToggles();
-  }
-
-  function applyTrailToggles(){
-    var map = TM.map;
-    if (!map || !map.getLayer("trail-line")) return;
-    map.setLayoutProperty("trail-line", "visibility", TM.tg.lines ? "visible" : "none");
-    map.setLayoutProperty("post-dot", "visibility", TM.tg.posts ? "visible" : "none");
-  }
-
-  function boundsOf(i){
-    var t = ST.trails[i];
-    if (!t) return null;
-    var b = new maplibregl.LngLatBounds();
-    t.lines.forEach(function(l){ l.forEach(function(p){ b.extend([p[1], p[0]]); }); });
-    return b;
-  }
-
-  function selectTrail(i, fly){
-    if (!ST.trails[i]) return;
-    TM.hl = i;
-    if (TM.map && TM.map.getSource("trail-hl")) TM.map.getSource("trail-hl").setData(hlFC(i));
-    Array.prototype.forEach.call(document.querySelectorAll(".tr-card"), function(c){
-      c.classList.toggle("sel", Number(c.getAttribute("data-i")) === i);
-    });
-    var card = document.querySelector('.tr-card[data-i="'+i+'"]');
-    if (fly) {
-      var page = document.getElementById("p-trail");
-      if (page) page.scrollTo({top:0, behavior:"smooth"});
-    } else {
-      if (card && card.scrollIntoView) card.scrollIntoView({block:"center", behavior:"smooth"});
-    }
-    if (fly && TM.map) {
-      var b = boundsOf(i);
-      if (b) TM.map.fitBounds(b, {padding:{top:60,bottom:70,left:40,right:40}, maxZoom:15, duration:700});
-    }
-  }
-
-  function fitAll(){
-    if (!TM.map || !ST.trails.length) return;
-    var b = new maplibregl.LngLatBounds();
-    ST.trails.forEach(function(t){ t.lines.forEach(function(l){ l.forEach(function(p){ b.extend([p[1], p[0]]); }); }); });
-    TM.map.fitBounds(b, {padding:{top:50,bottom:50,left:30,right:30}, duration:700});
-  }
-
-  function renderTrails(){
-    var list = document.getElementById("tr-list");
-    var q = (document.getElementById("tr-q").value || "").trim().toLowerCase();
-    var rows = ST.trails.map(function(t,i){ return {t:t, i:i}; }).filter(function(r){
-      if (TM.lv && r.t.lv !== TM.lv) return false;
-      if (!q) return true;
-      return ((r.t.n + " " + r.t.e + " " + (r.t.ty||"") + " " + (r.t.rg||"") + " " +
-               (r.t.sp||"") + " " + (r.t.ep||"") + " " + (r.t.lv||"")) || "").toLowerCase().indexOf(q) >= 0;
-    });
-    document.getElementById("tr-count").textContent =
-      (q || TM.lv ? "符合 " : "共 ") + rows.length + " 段路線"
-      + (TM.lv ? "（" + TM.lv + "）" : "") + (q ? "" : "，依官方長度排序");
-    if (!rows.length) { list.innerHTML = '<div class="tr-card"><div class="sub">冇匹配路線</div></div>'; return; }
-    list.innerHTML = rows.map(function(r){
-      var t = r.t;
-      var c = LVC[t.lv] || "#8fa3ad";
-      var meta = [t.ty, t.rg].filter(Boolean).join(" · ");
-      var route = t.sp && t.ep ? (t.sp + " → " + t.ep) : "";
-      return '<div class="tr-card'+(TM.hl === r.i ? " sel" : "")+'" data-i="'+r.i+'">'
-        + '<div class="t"><h3>'+esc(t.n || t.e)+'</h3><span class="km">'+t.len+' km</span></div>'
-        + '<div class="sub"><span class="lv" style="color:'+c+'">'+esc(t.lv)+'</span>'+esc(t.e || "")+'</div>'
-        + (meta || route ? '<div class="sub2">'+esc([meta, route].filter(Boolean).join(" · "))+'</div>' : "")
-        + '<div class="acts"><button data-fly="'+r.i+'">在地圖看</button></div>'
-        + "</div>";
-    }).join("");
-    Array.prototype.forEach.call(list.querySelectorAll("button[data-fly]"), function(b){
-      b.addEventListener("click", function(){
-        selectTrail(Number(b.getAttribute("data-fly")), true);
-      });
-    });
-    Array.prototype.forEach.call(list.querySelectorAll(".tr-card[data-i]"), function(c){
-      c.addEventListener("click", function(e){
-        if (e.target.tagName === "BUTTON") return;
-        selectTrail(Number(c.getAttribute("data-i")), true);
-      });
-    });
-  }
-
-  function ensureTrails(){
-    if (TM.loaded || TM.loading) { if (TM.loaded) renderTrails(); return; }
-    TM.loading = true;
-    fetch("data/trails.json?t=" + Date.now()).then(function(r){ return r.json(); }).then(function(d){
-      ST.trails = d.trails || [];
-      ST.posts = d.posts || [];
-      ST.trailMeta = d;
-      TM.loaded = true; TM.loading = false;
-      var km = 0;
-      ST.trails.forEach(function(t){ km += t.len; });
-      document.getElementById("tr-n").textContent = ST.trails.length;
-      document.getElementById("tr-p").textContent = num(ST.posts.length);
-      document.getElementById("tr-km").textContent = Math.round(km) + " km";
-      document.getElementById("tr-sub").textContent =
-        "漁護署官方遠足徑圖層 · " + ST.trails.length + " 段 · " + num(ST.posts.length)
-        + " 支標距柱 · 按難度上色";
-      renderLevels();
-      renderTrails();
-      if (TM.map) syncTrailLayers(TM.map);
-    }).catch(function(){
-      TM.loading = false;
-      document.getElementById("tr-sub").textContent = "山徑資料載入失敗（請用 http 伺服器開啟）";
-    });
-  }
-
-  function wireTrailUI(){
-    document.getElementById("tr-q").addEventListener("input", renderTrails);
-    document.getElementById("tr-fit").addEventListener("click", fitAll);
-    [["tr-tg-lines","lines"],["tr-tg-posts","posts"]].forEach(function(pair){
-      var b = document.getElementById(pair[0]);
-      b.setAttribute("aria-pressed", TM.tg[pair[1]]);
-      b.addEventListener("click", function(){
-        TM.tg[pair[1]] = !TM.tg[pair[1]];
-        b.setAttribute("aria-pressed", TM.tg[pair[1]]);
-        applyTrailToggles();
-      });
+      CF.size += 24; renderCafes();
     });
   }
 
@@ -1388,16 +1301,16 @@ setInterval(loadRadar, 720000);
     return Promise.all([
       fetch("data/parking.json"+bust).then(function(r){ return r.json(); }),
       fetch("data/meters.json"+bust).then(function(r){ return r.json(); }),
-      fetch("data/cafes.json"+bust).then(function(r){ return r.json(); })
+      fetch("data/cafes.json"+bust).then(function(r){ return r.json(); }),
+      fetch("data/trails.json"+bust).then(function(r){ return r.json(); })
     ]).then(function(res){
-      var pk = res[0], mt = res[1], fc = res[2];
-      ST.parks = pk.parks || []; ST.meters = mt.spaces || []; ST.cafes = fc.cafes || [];
-      ST.pm = pk; ST.mm = mt; ST.cm = fc;
+      var pk = res[0], mt = res[1], fc = res[2], tr = res[3];
+      ST.parks = pk.parks || []; ST.meters = mt.spaces || [];
+      ST.cafes = fc.cafes || []; ST.trails = tr.trails || []; ST.posts = tr.posts || [];
+      ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
 
-      var total = 0, open = 0, none = 0;
-      ST.parks.forEach(function(p){
-        if (p.v > 0) { total += p.v; open++; } else if (p.v < 0) none++;
-      });
+      var total = 0, open = 0;
+      ST.parks.forEach(function(p){ if (p.v > 0) { total += p.v; open++; } });
       document.getElementById("s-vac").textContent = num(total);
       document.getElementById("s-open").textContent = open + " / " + ST.parks.length;
       document.getElementById("s-meter").textContent = num(mt.vacant || 0);
@@ -1412,29 +1325,51 @@ setInterval(loadRadar, 720000);
         sel.appendChild(o);
       });
       document.getElementById("cf-sub").textContent =
-        ST.cafes.length + " 間咖啡店 · 資料為事實欄位與原文節錄 · 不含照片與標誌";
+        ST.cafes.length + " 間咖啡店 · 事實欄位＋原文節錄 · 不含照片與標誌";
+      document.getElementById("open-cafe").textContent = "Cafe " + ST.cafes.length + " 間";
 
-      if (ST.map) drawLayers(ST.map);
-      renderCafes();
+      var km = 0;
+      ST.trails.forEach(function(t){ km += t.len; });
+      document.getElementById("tr-n") && (document.getElementById("tr-n").textContent = ST.trails.length);
+      document.getElementById("tr-sub").textContent =
+        "漁護署官方圖層 · " + ST.trails.length + " 段 · " + num(ST.posts.length)
+        + " 支標距柱 · " + Math.round(km) + " km";
+      document.getElementById("open-trail").textContent = "山徑 " + ST.trails.length + " 段";
+
+      if (ST.map) syncLayers(ST.map);
+      renderLevels(); renderTrails(); renderCafes();
     }).catch(function(){
       document.getElementById("s-time").textContent = "資料載入失敗（請用 http 伺服器開啟）";
-      document.getElementById("cf-sub").textContent = "資料載入失敗（請用 http 伺服器開啟）";
+      document.getElementById("cf-sub").textContent = "資料載入失敗";
+      document.getElementById("tr-sub").textContent = "資料載入失敗";
     });
   }
 
-  window.__hk = { ST: ST, TM: TM };
+  /* ---------- routing ---------- */
+  function go(h){
+    if (h === "now") { showTab("tab-now"); return; }
+    showTab("tab-map");
+    if (h === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); openSheet("p-cafe"); }
+    else if (h === "trail" || h === "trails") { TG.trails = true; setBtn("tg-trails", true); openSheet("p-trail"); }
+    else if (h === "park") { TG.parks = true; setBtn("tg-parks", true); }
+    applyToggles();
+    try { history.replaceState(null, "", "#" + h); } catch(e){}
+  }
 
   document.addEventListener("DOMContentLoaded", function(){
     wireSearch(); wireCafeUI(); wireTrailUI();
-    if (["park","cafe","trail"].indexOf(hash) >= 0) showTab("tab-" + hash);
+    var h = (location.hash || "").replace("#", "");
+    if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
   });
 
   window.addEventListener("hashchange", function(){
-    var h = (location.hash || "").replace("#","");
-    if (["now","park","cafe","trail"].indexOf(h) >= 0) showTab("tab-" + h);
+    var h = (location.hash || "").replace("#", "");
+    if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
   });
+
+  window.__hk = { ST: ST, TG: TG };
 })();
 
 </script>
