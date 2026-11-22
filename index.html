@@ -820,6 +820,28 @@ setInterval(loadRadar, 720000);
   var parkColorExpr = ["case", ["<", ["get","v"], 0], "#3a4757",
       ["step", ["get","v"], "#ff6b78", 1, "#ff9f43", 5, "#ffd166", 20, "#54d8c4"]];
 
+  /* 停車場圖示：圓底 P，顏色沿用空位等級 */
+  var PKC = {a:"#54d8c4", b:"#ffd166", c:"#ff9f43", d:"#ff6b78", x:"#5b6875"};
+  function pkIconImg(fill, dark){
+    var S = 48, cv = document.createElement("canvas");
+    cv.width = cv.height = S;
+    var g = cv.getContext("2d"), r = S / 2;
+    g.beginPath(); g.arc(r, r, r - 2, 0, Math.PI * 2);
+    g.fillStyle = fill; g.fill();
+    g.lineWidth = 5; g.strokeStyle = "rgba(7,10,16,.92)"; g.stroke();
+    g.fillStyle = dark ? "#0b1016" : "#ffffff";
+    g.font = "700 " + Math.round(S * .6) + "px 'PingFang HK','Microsoft JhengHei',Arial,sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("P", r, r + 1.5);
+    return g.getImageData(0, 0, S, S);
+  }
+  function addParkIcons(map){
+    Object.keys(PKC).forEach(function(k){
+      if (map.hasImage("pk-" + k)) return;
+      map.addImage("pk-" + k, pkIconImg(PKC[k], k === "b"), {pixelRatio:2});
+    });
+  }
+
   /* ---------- tabs ---------- */
   var TABS = [["tab-now","p-now"],["tab-map","p-park"]];
   function showTab(key){
@@ -925,6 +947,7 @@ setInterval(loadRadar, 720000);
       }
     });
 
+    addParkIcons(map);
     map.addSource("parks", {type:"geojson", data: parksFC()});
     map.addLayer({
       id:"park-halo", type:"circle", source:"parks",
@@ -934,11 +957,12 @@ setInterval(loadRadar, 720000);
       }
     });
     map.addLayer({
-      id:"park-dot", type:"circle", source:"parks",
-      paint:{
-        "circle-radius":["interpolate",["linear"],["zoom"],10,3.4,16,7.4],
-        "circle-color":parkColorExpr,
-        "circle-stroke-width":1.1, "circle-stroke-color":"rgba(7,10,16,.85)"
+      id:"park-icon", type:"symbol", source:"parks",
+      layout:{
+        "icon-image":["match",["get","cls"],
+          "a","pk-a","b","pk-b","c","pk-c","d","pk-d","pk-x"],
+        "icon-size":["interpolate",["linear"],["zoom"],10,.6,13,.8,16,1.02],
+        "icon-padding":2
       }
     });
     map.addSource("meters", {type:"geojson", data: metersFC()});
@@ -962,12 +986,12 @@ setInterval(loadRadar, 720000);
       }
     });
 
-    map.on("click","park-dot", function(e){ parkPopup(e); });
+    map.on("click","park-icon", function(e){ parkPopup(e); });
     map.on("click","meter-dot", function(e){ meterPopup(e); });
     map.on("click","cafe-dot", function(e){ cafePopup(e); });
     map.on("click","post-dot", function(e){ postPopup(e); });
     map.on("click","trail-line", function(e){ trailPopup(e); });
-    ["park-dot","meter-dot","cafe-dot","post-dot","trail-line"].forEach(function(id){
+    ["park-icon","meter-dot","cafe-dot","post-dot","trail-line"].forEach(function(id){
       map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
     });
@@ -988,7 +1012,8 @@ setInterval(loadRadar, 720000);
   function parksFC(){
     return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
       return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
-        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h}};
+        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h,
+          cls: p.v < 0 ? "x" : p.v >= 20 ? "a" : p.v >= 5 ? "b" : p.v >= 1 ? "c" : "d"}};
     })};
   }
   function metersFC(){
@@ -1092,14 +1117,14 @@ setInterval(loadRadar, 720000);
   /* ---------- toggles ---------- */
   function applyToggles(){
     var map = ST.map;
-    if (!map || !map.getLayer("park-dot")) return;
+    if (!map || !map.getLayer("park-icon")) return;
     var vis = function(id, on){ map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); };
-    vis("park-halo", TG.parks); vis("park-dot", TG.parks);
+    vis("park-halo", TG.parks); vis("park-icon", TG.parks);
     vis("meter-dot", TG.meters); vis("cafe-dot", TG.cafes);
     vis("trail-line", TG.trails); vis("trail-hl", TG.trails);
     vis("post-dot", TG.trails && TG.posts);
     var f = TG.free ? [">=",["get","v"],3] : null;
-    map.setFilter("park-dot", f); map.setFilter("park-halo", f);
+    map.setFilter("park-icon", f); map.setFilter("park-halo", f);
   }
   [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],
    ["tg-trails","trails"],["tg-posts","posts"],["tg-free","free"]].forEach(function(pair){
