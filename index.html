@@ -126,7 +126,7 @@ body{overflow:hidden;height:100vh}
 #p-now .wrap{margin-top:0}
 
 /* ---------- 地圖頁 ---------- */
-#p-park{padding-top:var(--tabh);height:100vh;position:relative;background:#070a10}
+#p-park{padding-top:var(--tabh);height:100vh;height:100dvh;position:relative;background:#070a10}
 #map{position:absolute;top:var(--tabh);left:0;right:0;bottom:0}
 .pk-hud{
   position:absolute;top:calc(var(--tabh) + 10px);left:10px;z-index:20;
@@ -142,7 +142,7 @@ body{overflow:hidden;height:100vh}
 
 /* 左下角圖層開關 */
 .pk-tools{
-  position:absolute;bottom:14px;left:10px;z-index:21;display:flex;gap:6px;flex-wrap:wrap;
+  position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:10px;z-index:21;display:flex;gap:6px;flex-wrap:wrap;
   max-width:min(340px, calc(100% - 20px));
   background:rgba(9,15,21,.55);border:1px solid var(--line);border-radius:12px;
   padding:8px;backdrop-filter:blur(10px);
@@ -169,9 +169,11 @@ body{overflow:hidden;height:100vh}
 .pk-tools button.pk-list{color:var(--ink);border-color:rgba(255,255,255,.22)}
 .pk-tools button.pk-list::before{display:none}
 .pk-tools button.pk-list::after{content:"▸";color:var(--dim);font-size:10px}
+/* 底部清單面板開着時，左下圖層開關收起（避免被面板切一半） */
+body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 
 .pk-legend{
-  position:absolute;bottom:14px;right:10px;z-index:20;
+  position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));right:10px;z-index:20;
   background:rgba(13,19,29,.92);border:1px solid var(--line);border-radius:10px;
   padding:8px 10px;font-size:10.5px;color:var(--dim);line-height:1.7;
 }
@@ -373,7 +375,12 @@ body{overflow:hidden;height:100vh}
   .pk-search{width:calc(100% - 20px);right:10px;top:calc(var(--tabh) + 56px)}
   .pk-legend{display:none}
   .pk-hud .pk-chip:nth-child(4){display:none}
-  .pk-tools{max-width:calc(100% - 20px)}
+  .pk-tools{left:8px;right:8px;max-width:none;gap:5px;padding:6px;bottom:calc(8px + env(safe-area-inset-bottom));
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pk-tools .pk-watch{grid-column:1/-1}
+  .pk-tools button{font-size:10.5px;padding:4px 6px;gap:4px;border-radius:7px;justify-content:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pk-tools button::before{width:6px;height:6px}
   .sheet{height:82vh}
 }
 
@@ -975,12 +982,20 @@ setInterval(loadRadar, 720000);
   });
 
   /* ---------- sheets ---------- */
+  function anySheetOn(){
+    return Array.prototype.some.call(document.querySelectorAll(".sheet"), function(s){ return s.classList.contains("on"); });
+  }
+  function syncSheetState(){
+    document.body.classList.toggle("sheet-on", anySheetOn());
+  }
   function openSheet(id){
     document.getElementById(id).classList.add("on");
+    syncSheetState();
     if (id === "p-meter") liveStart();
   }
   function closeSheet(id){
     document.getElementById(id).classList.remove("on");
+    syncSheetState();
     if (id === "p-meter") liveStop();
   }
   Array.prototype.forEach.call(document.querySelectorAll(".sheet-close"), function(b){
