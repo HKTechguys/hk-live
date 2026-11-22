@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1016">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="掃一下">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>香港即時 · 掃一下</title>
 <style>
   :root{
@@ -95,6 +102,12 @@
 </style>
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
+/* 手機／可用性基礎：深色原生控件、點按延遲、面板唔連鎖滾動 */
+:root{color-scheme:dark}
+button,select,input,textarea{touch-action:manipulation;-webkit-tap-highlight-color:rgba(84,216,196,.15)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.sheet .inner,.sheet{overscroll-behavior:contain}
+
 /* ===== 單一地圖頁 + 底部清單面板（沿用原站 teal/dark 主題） ===== */
 :root{
   --tabh:52px;
@@ -193,6 +206,18 @@ body{overflow:hidden;height:100vh}
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
 }
 .pk-tools button#tg-cafes[aria-pressed="true"]::before{background:var(--teal)}
+/* 車輛種類 chips（任何車輛／貨車／旅遊巴） */
+.mt-vt{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;touch-action:manipulation}
+.mt-vt::-webkit-scrollbar{display:none}
+.mt-vtbtn{flex:none;font:inherit;font-size:11px;color:var(--dim);background:rgba(13,19,29,.9);
+  border:1px solid var(--line);border-radius:999px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;
+  cursor:pointer;white-space:nowrap;touch-action:manipulation}
+.mt-vtbtn em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink);font-size:11px}
+.mt-vtbtn.on{color:var(--teal);border-color:rgba(84,216,196,.5);background:rgba(84,216,196,.12)}
+.mt-vtbtn.on em{color:var(--teal)}
+.mt-vt:empty{display:none}
+
 /* 底部清單面板開着時，左下圖層開關收起（避免被面板切一半） */
 body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 
@@ -423,6 +448,8 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pk-tools button::before{width:6px;height:6px}
   .sheet{height:82vh}
+  /* iOS 聚焦 <16px 輸入框會自動放大整頁 */
+  .cf-search input,.cf-search select,.pk-search input{font-size:16px}
 }
 
 /* 窄機（≤380px）：HUD 兩行兩格，搜尋列讓位 */
@@ -930,6 +957,7 @@ setInterval(loadRadar, 720000);
       <button id="mt-refresh" class="mt-refresh" title="即刻拉運輸署最新狀態">↻ 更新</button>
       <span id="mt-count" class="cf-count"></span>
     </div>
+    <div class="mt-vt" id="mt-vt"></div>
     <div class="mt-list" id="mt-list"></div>
     <button class="cf-more" id="mt-more" style="display:none">顯示更多街道</button>
     <div class="cf-note">
@@ -1234,7 +1262,7 @@ setInterval(loadRadar, 720000);
   function metersFC(){
     return {type:"FeatureCollection", features:(ST.meters||[]).map(function(m){
       return {type:"Feature", geometry:{type:"Point", coordinates:[m[2],m[1]]},
-        properties:{id:m[0], st:m[3], s:m[4], d:m[5]}};
+        properties:{id:m[0], st:m[3], s:m[4], d:m[5], vt:m[6] || ""}};
     })};
   }
   function cafesFC(){
@@ -1567,6 +1595,7 @@ setInterval(loadRadar, 720000);
     new maplibregl.Popup({maxWidth:"270px"}).setLngLat(lnglat)
       .setHTML('<div class="pp"><h4>'+esc(q.s||"路邊泊車位")+'</h4>'
         + '<div class="sub">'+esc(q.d||"")+' · 位號 '+esc(q.id)+'</div>'
+        + '<div class="row"><span>車輛種類</span><span>'+esc(vtLabel(q.vt))+'</span></div>'
         + '<div class="row"><span>狀態</span><span style="color:'+(st===1?"#ff6b78":st===0?"#54d8c4":"#8fa3ad")+'">'
         + (st===1?"佔用中":st===0?"空置":"暫無讀數")+'</span></div>'
         + '<div class="row"><span>更新</span><span>'+esc(ST.mm.last_update||"")+'</span></div>'
@@ -1825,10 +1854,32 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- 咪錶位：按街道分組的清單 ---------- */
-  var MI = {q:"", dist:"", free:false, shown:24, size:24, open:"", sp:30, cache:null};
+  var MI = {q:"", dist:"", free:false, shown:24, size:24, open:"", sp:30, cache:null, vt:""};
+  var VTL = {A:"任何車輛", G:"貨車", C:"旅遊巴"};
+  function vtLabel(v){ return VTL[v] || "未標示"; }
+  function renderVtChips(){
+    var el = document.getElementById("mt-vt");
+    if (!el) return;
+    var arr = ST.meters || [], c = {all:arr.length, A:0, G:0, C:0, x:0};
+    arr.forEach(function(m){
+      if (m[6] === "A") c.A++; else if (m[6] === "G") c.G++; else if (m[6] === "C") c.C++; else c.x++;
+    });
+    var opts = [["", "全部", c.all], ["A", "任何車輛", c.A], ["G", "貨車", c.G], ["C", "旅遊巴", c.C]];
+    if (c.x) opts.push(["#", "未標示", c.x]);
+    el.innerHTML = opts.map(function(o){
+      var on = MI.vt === o[0];
+      return '<button class="mt-vtbtn' + (on ? " on" : "") + '" data-mvt="' + o[0] + '"'
+        + ' aria-pressed="' + (on ? "true" : "false") + '">' + o[1] + '<em>' + num(o[2]) + '</em></button>';
+    }).join("");
+  }
   function meterCache(){
     if (MI.cache) return MI.cache;
     var g = {}, arr = ST.meters || [], vac = 0;
+    if (MI.vt) {
+      arr = arr.filter(function(m){
+        return MI.vt === "#" ? !VTL[m[6]] : m[6] === MI.vt;
+      });
+    }
     arr.forEach(function(m){
       if (Number(m[3]) === 0) vac++;
       var s = m[4] || "（未列街道）", d = m[5] || "", k = s + "|" + d;
@@ -1914,6 +1965,7 @@ setInterval(loadRadar, 720000);
     }).sort(function(a, b){ return (b.v - a.v) || (b.n - a.n) || (a.s > b.s ? 1 : -1); });
 
     liveSub();
+    renderVtChips();
     document.getElementById("mt-count").textContent =
       "符合 " + rows.length + " 條街道" + (MI.q || MI.dist || MI.free ? "" : "，按空置位排序");
 
@@ -1975,6 +2027,13 @@ setInterval(loadRadar, 720000);
       this.setAttribute("aria-expanded", box.classList.contains("min") ? "false" : "true");
     });
     document.addEventListener("click", function(e){
+      var vt = e.target.closest && e.target.closest("[data-mvt]");
+      if (vt) {
+        MI.vt = vt.getAttribute("data-mvt");
+        MI.cache = null; MI.open = ""; MI.shown = MI.size;
+        renderMeters();
+        return;
+      }
       var m = e.target.closest && e.target.closest("[data-ms]");
       if (m) {
         var k = m.getAttribute("data-ms");
@@ -2197,6 +2256,11 @@ setInterval(loadRadar, 720000);
   });
 
   window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck, LIVE: LIVE, livePull: livePull, liveApply: liveApply };
+
+  /* 加到主畫面：SW 只為安裝資格，不快取任何嘢 */
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  }
 })();
 
 </script>

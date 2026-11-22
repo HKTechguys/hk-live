@@ -1,0 +1,17 @@
+{
+  "name": "香港即時 · 掃一下（咪錶／停車場）",
+  "short_name": "掃一下",
+  "description": "路邊感應咪錶即時空位、停車場空位、Cafe、遠足徑",
+  "lang": "zh-HK",
+  "start_url": "./index.html#meter",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1016",
+  "theme_color": "#0b1016",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
