@@ -151,10 +151,23 @@ body{overflow:hidden;height:100vh}
   padding:1px 3px 5px;letter-spacing:.2px}
 .pk-tools .pk-watch[hidden]{display:none}
 .hk-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:130;
-  background:#111a22;border:1px solid rgba(84,216,196,.42);color:#eaf6f5;font-size:12px;
+  background:#111a22;border:1px solid rgba(84,216,196,.42);color:#eaf6f5;font-size:11.5px;
   padding:9px 14px;border-radius:10px;max-width:min(420px,86vw);line-height:1.5;
   box-shadow:0 10px 28px rgba(0,0,0,.55);transition:opacity .4s,transform .4s}
 .hk-toast.out{opacity:0;transform:translateX(-50%) translateY(10px)}
+/* 有位大提示 */
+.hk-alert{position:fixed;left:50%;top:calc(var(--tabh) + 10px);transform:translateX(-50%);z-index:145;
+  width:min(520px,calc(100% - 20px));display:flex;align-items:center;gap:10px;
+  background:#1b2320;border:2px solid #ffd166;border-radius:14px;padding:11px 13px;
+  box-shadow:0 12px 40px rgba(0,0,0,.62);animation:hkIn .22s ease-out}
+.hk-alert .ic{font-size:20px;line-height:1}
+.hk-alert .tx{flex:1;min-width:0}
+.hk-alert .tx b{display:block;font-size:14px;color:#ffd166;letter-spacing:.02em}
+.hk-alert .tx span{display:block;font-size:11.5px;color:#dfe9ea;line-height:1.5;margin-top:2px}
+.hk-alert .go{font:inherit;font-size:12px;color:#0b1016;background:#ffd166;border:0;border-radius:8px;
+  padding:7px 11px;cursor:pointer;white-space:nowrap}
+.hk-alert .x{font:inherit;font-size:14px;color:#8fa3ad;background:none;border:0;cursor:pointer;padding:2px 4px}
+@keyframes hkIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%)}}
 .pp-act button.on{border-color:#ffd166;background:rgba(255,209,102,.12);color:#ffd166}
 .pk-tools button{
   font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
@@ -208,7 +221,7 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 }
 .sheet.on{transform:none}
 .sheet-head{
-  position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:6;display:flex;align-items:center;justify-content:space-between;
   padding:10px 16px;background:rgba(11,16,22,.96);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
@@ -289,11 +302,16 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .mt-bar .mt-wdist[aria-pressed="true"],.mt-bar .mt-wdist.on{color:#ffd166;border-color:rgba(255,209,102,.45)}
 .mt-bar .mt-refresh{color:var(--teal);border-color:rgba(84,216,196,.35)}
 .mt-bar .mt-refresh[disabled]{opacity:.55;cursor:default}
-.mt-wbox{border:1px solid rgba(255,209,102,.28);background:rgba(255,209,102,.05);border-radius:11px;
-  padding:9px 11px;margin:2px 0 10px}
-.mt-whead{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:#ffd166}
+.mt-wbox{position:sticky;top:49px;z-index:5;border:1px solid rgba(255,209,102,.35);background:#121a24;
+  border-radius:11px;padding:9px 11px;margin:2px 0 10px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.mt-wbox.min .mt-wlist,.mt-wbox.min .mt-whint{display:none}
+.mt-wbox.has{border-color:rgba(255,209,102,.6);background:#171f26}
+.mt-whead{display:flex;align-items:center;gap:8px;font-size:12px;color:#ffd166}
 .mt-whead b{font-weight:600}
-.mt-whead span{color:var(--dim);font-size:10.5px}
+.mt-whead span{color:var(--dim);font-size:10.5px;margin-left:auto}
+.mt-wtoggle{font:inherit;font-size:12px;line-height:1;color:var(--dim);background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,209,102,.25);border-radius:7px;padding:3px 7px;cursor:pointer}
+.mt-wbox.min .mt-wtoggle{transform:rotate(-90deg)}
 .mt-wlist{display:flex;flex-direction:column;gap:5px;margin-top:6px}
 .mt-wrow{display:flex;align-items:center;gap:8px;font-size:12px;color:#dfe9ea;
   border:1px solid rgba(255,209,102,.18);background:rgba(9,14,20,.55);border-radius:8px;padding:6px 9px}
@@ -374,7 +392,12 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
   .tabbar .live{display:none}
   .pk-search{width:calc(100% - 20px);right:10px;top:calc(var(--tabh) + 56px)}
   .pk-legend{display:none}
-  .pk-hud .pk-chip:nth-child(4){display:none}
+  .pk-hud{gap:5px}
+  .pk-chip{padding:4px 7px}
+  .pk-chip i{font-size:8.5px;letter-spacing:0}
+  .pk-chip b{font-size:13px}
+  .pk-hud .pk-chip:nth-child(4){display:block}
+  .pk-hud .pk-chip:nth-child(4) b{font-size:10.5px!important}
   .pk-tools{left:8px;right:8px;max-width:none;gap:5px;padding:6px;bottom:calc(8px + env(safe-area-inset-bottom));
     display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
   .pk-tools .pk-watch{grid-column:1/-1}
@@ -382,6 +405,12 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pk-tools button::before{width:6px;height:6px}
   .sheet{height:82vh}
+}
+
+/* 窄機（≤380px）：HUD 兩行兩格，搜尋列讓位 */
+@media (max-width:380px){
+  .pk-hud{display:grid;grid-template-columns:1fr 1fr;gap:5px;left:8px;right:8px;max-width:none}
+  .pk-search{top:calc(var(--tabh) + 100px)}
 }
 
 </style>
@@ -807,7 +836,7 @@ setInterval(loadRadar, 720000);
     <div class="pk-chip"><i>停車場總空位</i><b class="g" id="s-vac">—</b></div>
     <div class="pk-chip"><i>有空位車場</i><b class="y" id="s-open">—</b></div>
     <div class="pk-chip"><i>路邊感應位剩餘</i><b class="g" id="s-meter">—</b></div>
-    <div class="pk-chip"><i>更新</i><b id="s-time" style="font-size:12px;font-weight:500">載入中…</b></div>
+    <div class="pk-chip"><i>停車場更新時間</i><b id="s-time" style="font-size:12px;font-weight:500">載入中…</b></div>
   </div>
 
   <div class="pk-search">
@@ -871,7 +900,9 @@ setInterval(loadRadar, 720000);
       <select id="mt-dist"><option value="">全部地區</option></select>
     </div>
     <div class="mt-wbox" id="mt-wbox">
-      <div class="mt-whead"><b>★ 提醒清單</b><span id="mt-wsum"></span></div>
+      <div class="mt-whead"><b>★ 提醒清單</b><span id="mt-wsum"></span>
+        <button class="mt-wtoggle" id="mt-wtoggle" aria-expanded="true" title="收起／展開提醒清單">▾</button>
+      </div>
       <div class="mt-wlist" id="mt-wlist"></div>
       <div class="mt-whint" id="mt-whint">未設提醒 — 撳街道右邊「☆ 提醒」、或下面「☆ 提醒此地區」，有位就通知你。</div>
     </div>
@@ -1351,19 +1382,35 @@ setInterval(loadRadar, 720000);
     wtPersist();
     if (typeof renderMeters === "function") renderMeters();
   }
+  function hkAlert(title, body, q){
+    var old = document.getElementById("hk-alert");
+    if (old) old.remove();
+    var el = document.createElement("div");
+    el.id = "hk-alert"; el.className = "hk-alert";
+    el.innerHTML = '<div class="ic">🅿️</div><div class="tx"><b>' + esc(title) + '</b><span>' + esc(body) + '</span></div>'
+      + '<button class="go">睇位</button><button class="x" title="關閉">✕</button>';
+    document.body.appendChild(el);
+    el.querySelector(".go").addEventListener("click", function(){
+      el.remove();
+      if (q) { MI.q = q; MI.shown = MI.size; MI.dist = ""; var ds = document.getElementById("mt-dist"); if (ds) ds.value = ""; }
+      go("meter");
+    });
+    el.querySelector(".x").addEventListener("click", function(){ el.remove(); });
+    setTimeout(function(){ if (el.parentNode) el.remove(); }, 16000);
+  }
   function wtNotice(h){
-    var title, body, tag;
-    if (h.street) { title = "有位！" + h.street; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-s-" + h.street; }
-    else if (h.district) { title = "有位！" + h.district; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-d-" + h.district; }
-    else { title = "有位！" + (h.w.n || "路邊泊車位"); body = "位號 " + h.w.id + " 由佔用中變空置"; tag = "hkwt-" + h.w.id; }
+    var title, body, tag, q;
+    if (h.street) { title = "有位！" + h.street; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-s-" + h.street; q = h.street; }
+    else if (h.district) { title = "有位！" + h.district; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-d-" + h.district; q = h.district; }
+    else { title = "有位！" + (h.w.n || "路邊泊車位"); body = "位號 " + h.w.id + " 由佔用中變空置"; tag = "hkwt-" + h.w.id; q = h.w.s || h.w.n || ""; }
     if ("Notification" in window && Notification.permission === "granted") {
       try {
-        var n = new Notification(title, {body: body, tag: tag});
+        var n = new Notification(title, {body: body, tag: tag, requireInteraction: true});
         n.onclick = function(){ try { window.focus(); } catch(e){} };
       } catch(e){}
     }
-    toast(title + " · " + body);
-    if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch(e){} }
+    hkAlert(title, body, q);
+    if (navigator.vibrate) { try { navigator.vibrate([140, 70, 140, 70, 220]); } catch(e){} }
   }
   function wtSeedScope(w){
     var arr = ST.meters || [], i, s, d, id;
@@ -1763,6 +1810,8 @@ setInterval(loadRadar, 720000);
     var list = document.getElementById("mt-wlist");
     if (!list) return;
     var hint = document.getElementById("mt-whint"), sum = document.getElementById("mt-wsum");
+    var box = document.getElementById("mt-wbox");
+    if (box) box.classList.toggle("has", !!WT.list.length);
     var b = document.getElementById("mt-wdist");
     if (b) {
       var d = MI.dist;
@@ -1866,6 +1915,11 @@ setInterval(loadRadar, 720000);
       wtToggleDistrict(MI.dist);
     });
     document.getElementById("mt-refresh").addEventListener("click", liveManual);
+    document.getElementById("mt-wtoggle").addEventListener("click", function(){
+      var box = document.getElementById("mt-wbox");
+      box.classList.toggle("min");
+      this.setAttribute("aria-expanded", box.classList.contains("min") ? "false" : "true");
+    });
     document.addEventListener("click", function(e){
       var m = e.target.closest && e.target.closest("[data-ms]");
       if (m) {
