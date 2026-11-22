@@ -147,6 +147,15 @@ body{overflow:hidden;height:100vh}
   background:rgba(9,15,21,.55);border:1px solid var(--line);border-radius:12px;
   padding:8px;backdrop-filter:blur(10px);
 }
+.pk-tools .pk-watch{flex:0 0 100%;font-size:11px;color:#ffd166;line-height:1.4;
+  padding:1px 3px 5px;letter-spacing:.2px}
+.pk-tools .pk-watch[hidden]{display:none}
+.hk-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:130;
+  background:#111a22;border:1px solid rgba(84,216,196,.42);color:#eaf6f5;font-size:12px;
+  padding:9px 14px;border-radius:10px;max-width:min(420px,86vw);line-height:1.5;
+  box-shadow:0 10px 28px rgba(0,0,0,.55);transition:opacity .4s,transform .4s}
+.hk-toast.out{opacity:0;transform:translateX(-50%) translateY(10px)}
+.pp-act button.on{border-color:#ffd166;background:rgba(255,209,102,.12);color:#ffd166}
 .pk-tools button{
   font:inherit;font-size:11.5px;color:var(--dim);background:rgba(13,19,29,.92);
   border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer;
@@ -757,6 +766,7 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-tools" id="layer-tools">
+    <div class="pk-watch" id="pk-watch" hidden></div>
     <button id="tg-parks" aria-pressed="true">停車場</button>
     <button id="tg-meters" aria-pressed="true">感應咪錶</button>
     <button id="tg-cafes" aria-pressed="false">Cafe</button>
@@ -1164,6 +1174,12 @@ setInterval(loadRadar, 720000);
     } else fb();
   }
   document.addEventListener("click", function(e){
+    var w = e.target.closest && e.target.closest("[data-wt]");
+    if (w) {
+      e.preventDefault();
+      wtToggle(w.getAttribute("data-wt"), w.getAttribute("data-wtn"), w);
+      return;
+    }
     var b = e.target.closest && e.target.closest("[data-copy]");
     if (!b) {
       var n = e.target.closest && e.target.closest("[data-nav]");
@@ -1179,6 +1195,88 @@ setInterval(loadRadar, 720000);
   function trailStart(t){
     var l = t && t.lines && t.lines[0] && t.lines[0][0];
     return l && l.length === 2 ? l : null;
+  }
+
+  /* ---------- 咪錶位：變空置就通知 ---------- */
+  var WT = {list:[], seen:{}};
+  function wtLoad(){
+    try { WT.list = JSON.parse(localStorage.getItem("hk_wt_list") || "[]") || []; } catch(e){ WT.list = []; }
+    try { WT.seen = JSON.parse(localStorage.getItem("hk_wt_seen") || "{}") || {}; } catch(e){ WT.seen = {}; }
+    wtChip();
+  }
+  function wtPersist(){
+    try {
+      localStorage.setItem("hk_wt_list", JSON.stringify(WT.list));
+      localStorage.setItem("hk_wt_seen", JSON.stringify(WT.seen));
+    } catch(e){}
+    wtChip();
+  }
+  function wtHas(id){
+    id = String(id);
+    for (var i = 0; i < WT.list.length; i++) if (WT.list[i].id === id) return true;
+    return false;
+  }
+  function wtChip(){
+    var el = document.getElementById("pk-watch");
+    if (!el) return;
+    if (!WT.list.length) { el.hidden = true; el.textContent = ""; el.removeAttribute("title"); return; }
+    el.hidden = false;
+    el.textContent = "★ 提醒中 " + WT.list.length + " 個咪錶位 · 變空置即通知";
+    el.title = WT.list.map(function(w){ return (w.n || "") + " " + w.id; }).join(" / ");
+  }
+  function wtAsk(){
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "default") { try { Notification.requestPermission(); } catch(e){} }
+  }
+  function toast(msg){
+    var t = document.createElement("div");
+    t.className = "hk-toast"; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.classList.add("out"); }, 2400);
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
+  }
+  function wtToggle(id, name, btn){
+    id = String(id);
+    var i = -1;
+    for (var k = 0; k < WT.list.length; k++) if (WT.list[k].id === id) { i = k; break; }
+    if (i >= 0) {
+      WT.list.splice(i, 1); delete WT.seen[id];
+      if (btn) { btn.textContent = "☆ 有位提示我"; btn.classList.remove("on"); }
+      toast("已取消提醒 · " + (name || id));
+    } else {
+      WT.list.push({id:id, n:name || ""});
+      var arr = ST.meters || [];
+      for (var j = 0; j < arr.length; j++) if (String(arr[j][0]) === id) { WT.seen[id] = Number(arr[j][3]); break; }
+      if (btn) { btn.textContent = "★ 已提醒"; btn.classList.add("on"); }
+      wtAsk();
+      toast("已加入提醒 · " + (name || id) + "，變空置會通知你");
+    }
+    wtPersist();
+  }
+  function wtNotice(w){
+    var title = "有位！" + (w.n || "路邊泊車位");
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        var n = new Notification(title, {body:"位號 " + w.id + " 由佔用中變空置", tag:"hkwt-" + w.id});
+        n.onclick = function(){ try { window.focus(); } catch(e){} };
+      } catch(e){}
+    }
+    toast(title + " · 位號 " + w.id);
+    if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch(e){} }
+  }
+  function wtCheck(spaces){
+    if (!WT.list.length) return;
+    var map = {}, i;
+    for (i = 0; i < spaces.length; i++) map[String(spaces[i][0])] = Number(spaces[i][3]);
+    var hits = [];
+    WT.list.forEach(function(w){
+      var now = map[w.id], prev = WT.seen[w.id];
+      if (now === undefined) return;
+      if (prev === 1 && now === 0) hits.push(w);
+      WT.seen[w.id] = now;
+    });
+    wtPersist();
+    hits.forEach(function(w, k){ setTimeout(function(){ wtNotice(w); }, k * 600); });
   }
 
   function parkPopup(e){
@@ -1209,7 +1307,11 @@ setInterval(loadRadar, 720000);
         + '<div class="row"><span>狀態</span><span style="color:'+(st===1?"#ff6b78":st===0?"#54d8c4":"#8fa3ad")+'">'
         + (st===1?"佔用中":st===0?"空置":"暫無讀數")+'</span></div>'
         + '<div class="row"><span>更新</span><span>'+esc(ST.mm.last_update||"")+'</span></div>'
-        + actBtns((q.s||"") + (q.d ? "，" + q.d : ""), lnglat[1], lnglat[0]) + '</div>')
+        + actBtns((q.s||"") + (q.d ? "，" + q.d : ""), lnglat[1], lnglat[0])
+        + '<div class="pp-act"><button data-wt="'+esc(q.id)+'" data-wtn="'+esc(q.s||"")+'"'
+        + (wtHas(q.id) ? ' class="on"' : "") + '>' + (wtHas(q.id) ? "★ 已提醒" : "☆ 有位提示我")
+        + "</button></div>"
+        + '</div>')
       .addTo(ST.map);
   }
 
@@ -1472,6 +1574,7 @@ setInterval(loadRadar, 720000);
       ST.parks = pk.parks || []; ST.meters = mt.spaces || [];
       ST.cafes = fc.cafes || []; ST.trails = tr.trails || []; ST.posts = tr.posts || [];
       ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
+      wtCheck(ST.meters);
 
       var total = 0, open = 0;
       ST.parks.forEach(function(p){ if (p.v > 0) { total += p.v; open++; } });
@@ -1522,7 +1625,7 @@ setInterval(loadRadar, 720000);
   }
 
   document.addEventListener("DOMContentLoaded", function(){
-    wireSearch(); wireCafeUI(); wireTrailUI();
+    wireSearch(); wireCafeUI(); wireTrailUI(); wtLoad();
     var h = (location.hash || "").replace("#", "");
     if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
     loadData();
@@ -1534,7 +1637,7 @@ setInterval(loadRadar, 720000);
     if (["now","map","park","cafe","trail"].indexOf(h) >= 0) go(h);
   });
 
-  window.__hk = { ST: ST, TG: TG };
+  window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck };
 })();
 
 </script>
