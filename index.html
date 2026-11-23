@@ -331,6 +331,12 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
   border:1px solid var(--line);background:#111a22;color:var(--ink);
 }
 .cf-search input{flex:1;min-width:150px}
+.cf-search #cf-park{
+  font:inherit;font-size:12.5px;padding:8px 11px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--line);background:#111a22;color:var(--dim);white-space:nowrap;
+}
+.cf-search #cf-park[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45);background:rgba(84,216,196,.1)}
+.cf-park{font-size:11.5px;color:var(--teal);margin-top:7px;line-height:1.5}
 .cf-count{font-size:11px;color:var(--dim);margin:6px 0 10px}
 .cf-list{display:flex;flex-direction:column;gap:9px}
 .cf-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
@@ -1017,8 +1023,9 @@ setInterval(loadRadar, 720000);
   <div class="inner">
     <p class="sheet-sub" id="cf-sub">載入中…</p>
     <div class="cf-search">
-      <input id="cf-q" type="search" placeholder="店名／街道／地區">
+      <input id="cf-q" type="search" aria-label="搜尋 Cafe 店名或街道" placeholder="店名／街道／地區">
       <select id="cf-dist"><option value="">全部地區</option></select>
+      <button id="cf-park" aria-pressed="false">🅿 150 米內有停車場</button>
     </div>
     <div class="cf-count" id="cf-count"></div>
     <div class="cf-list" id="cf-list"></div>
@@ -1872,7 +1879,24 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- cafe list ---------- */
-  var CF = {q:"", dist:"", shown:0, size:24, rows:[]};
+  var CF = {q:"", dist:"", shown:0, size:24, rows:[], park:false, pc:{}};
+  /* 最近停車場（直線 150 米內，約行 2 分鐘），緯度 111000 / 經度 103000 米估算 */
+  var PKNEAR = 150;
+  function nearPark(c){
+    var key = c.s || c.n;
+    if (CF.pc[key] !== undefined) return CF.pc[key];
+    var res = null, best = PKNEAR * PKNEAR, arr = ST.parks || [], i, p, dy, dx, d;
+    for (i = 0; i < arr.length; i++) {
+      p = arr[i];
+      dy = (Number(c.la) - p.la) * 111000;
+      dx = (Number(c.lo) - p.lo) * 103000;
+      d = dy * dy + dx * dx;
+      if (d < best) { best = d; res = {n: p.n, d: Math.round(Math.sqrt(d))}; }
+    }
+    if (res && res.d > PKNEAR) res = null;
+    CF.pc[key] = res;
+    return res;
+  }
   function renderCafes(){
     var list = document.getElementById("cf-list");
     var cnt = document.getElementById("cf-count");
@@ -1880,18 +1904,24 @@ setInterval(loadRadar, 720000);
     var v = CF.q.trim().toLowerCase();
     CF.rows = ST.cafes.filter(function(c){
       if (CF.dist && c.d !== CF.dist) return false;
+      if (CF.park && !nearPark(c)) return false;
       if (!v) return true;
       return ((c.n+" "+c.a+" "+c.d)||"").toLowerCase().indexOf(v) >= 0;
     });
-    cnt.textContent = "共 " + CF.rows.length + " 間" + (CF.dist ? "（" + CF.dist + "）" : "");
+    var pk = 0;
+    ST.cafes.forEach(function(c){ if (nearPark(c)) pk++; });
+    cnt.textContent = "共 " + CF.rows.length + " 間" + (CF.dist ? "（" + CF.dist + "）" : "")
+      + " · 全港 " + pk + " 間 " + PKNEAR + " 米內有停車場";
     var slice = CF.rows.slice(0, CF.shown + CF.size);
     CF.shown = slice.length;
     list.innerHTML = slice.map(function(c){
       var mono = esc((c.n||"?").trim().charAt(0));
+      var np = nearPark(c);
       return '<div class="cf-card">'
         + '<div class="cf-head"><div class="cf-mono">'+mono+'</div>'
         + '<div class="t"><h3>'+esc(c.n)+'</h3>'
         + '<div class="sub">'+esc(c.d||"")+(c.a ? " · "+esc(c.a) : "")+'</div></div></div>'
+        + (np ? '<div class="cf-park">🅿 '+esc(np.n)+' · 約 '+np.d+' 米</div>' : "")
         + (c.h ? '<div class="cf-hours">'+esc(c.h)+'</div>' : "")
         + (c.x ? '<div class="cf-x">'+esc(c.x)+'</div>' : "")
         + '<div class="cf-actions">'
@@ -1922,6 +1952,11 @@ setInterval(loadRadar, 720000);
     });
     document.getElementById("cf-dist").addEventListener("change", function(){
       CF.dist = this.value; CF.shown = 0; renderCafes();
+    });
+    document.getElementById("cf-park").addEventListener("click", function(){
+      CF.park = !CF.park; CF.shown = 0;
+      this.setAttribute("aria-pressed", CF.park ? "true" : "false");
+      renderCafes();
     });
     document.getElementById("cf-more").addEventListener("click", function(){
       CF.size += 24; renderCafes();
@@ -2399,6 +2434,8 @@ setInterval(loadRadar, 720000);
       }
       var src = ST.map && ST.map.getSource("parks");
       if (src) src.setData(parksFC());
+      CF.pc = {};
+      if (document.getElementById("p-cafe") && document.getElementById("p-cafe").classList.contains("on")) renderCafes();
       var total = 0, open = 0, i, p;
       for (i = 0; i < ST.parks.length; i++){ p = ST.parks[i]; if (p.v > 0){ total += p.v; open++; } }
       var sv = document.getElementById("s-vac"), so = document.getElementById("s-open"),
