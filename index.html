@@ -457,6 +457,9 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .pk-rf.spin{animation:rfspin .9s linear infinite;color:var(--teal)}
 @keyframes rfspin{to{transform:rotate(360deg)}}
 .pk-rf[disabled]{opacity:.55}
+@media (prefers-reduced-motion: reduce){
+  .pk-rf.spin,.hk-alert{animation:none}
+}
 
 @media (max-width:520px){
   .tabbar button{font-size:12.5px;padding:6px 11px}
@@ -913,7 +916,7 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-search">
-    <input id="q" type="search" placeholder="車場／街道／Cafe／山徑，例如 中環">
+    <input id="q" type="search" aria-label="搜尋車場、街道或 Cafe" placeholder="車場／街道／Cafe／山徑，例如 中環">
     <div class="pk-results" id="results"></div>
   </div>
 
@@ -1294,7 +1297,7 @@ setInterval(loadRadar, 720000);
   function parksFC(){
     return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
       return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
-        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"", oldp:p.oldp?1:0,
+        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"", oldp:p.oldp?1:0, snap:p.snap?1:0,
           cls: p.v < 0 ? "x" : p.v >= 20 ? "a" : p.v >= 5 ? "b" : p.v >= 1 ? "c" : "d"}};
     })};
   }
@@ -1481,6 +1484,7 @@ setInterval(loadRadar, 720000);
   function toast(msg){
     var t = document.createElement("div");
     t.className = "hk-toast"; t.textContent = msg;
+    t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite");
     document.body.appendChild(t);
     setTimeout(function(){ t.classList.add("out"); }, 2400);
     setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
@@ -1624,7 +1628,8 @@ setInterval(loadRadar, 720000);
         + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
         + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
         + '<div class="row"><span>更新</span><span>'+(p.u
-            ? esc(String(p.u).slice(0,24)) + (p.oldp ? ' <em style="font-style:normal;color:#8fa3ad">· 較舊</em>' : "")
+            ? esc(String(p.u).slice(0,16)) + (p.snap ? ' <em style="font-style:normal;color:#8fa3ad">· 運輸署快照</em>'
+              : p.oldp ? ' <em style="font-style:normal;color:#8fa3ad">· 較舊</em>' : "")
             : "無實時數據")+'</span></div>'
         + '<span class="tag" style="background:rgba(84,216,196,.12);color:'+valColor(v)+'">'+tag+'</span>'
         + actBtns(p.a || p.d, lnglat[1], lnglat[0]) + '</div>')
@@ -2378,7 +2383,7 @@ setInterval(loadRadar, 720000);
   }
   function pkLive(force){
     if (!PUSH.api) return Promise.resolve(false);
-    if (PKL.busy) return Promise.resolve(false);
+    if (PKL.busy) return Promise.resolve(null);
     PKL.busy = true;
     return fetch(PUSH.api + "/parks" + (force ? "?t=" + Date.now() : "")).then(function(r){ return r.json(); }).then(function(d){
       PKL.busy = false;
@@ -2390,7 +2395,7 @@ setInterval(loadRadar, 720000);
       for (i0 = 0; i0 < ST.parks.length; i0++) {
         var q = ST.parks[i0];
         if (q.v >= 0 || !snap[q.id] || snap[q.id].v < 0) continue;
-        q.v = snap[q.id].v; q.u = (ST.pm.generated || ST.pm.last_update || "") + "（運輸署快照）"; q.oldp = 1;
+        q.v = snap[q.id].v; q.u = ST.pm.generated || ST.pm.last_update || ""; q.oldp = 1; q.snap = 1;
       }
       var src = ST.map && ST.map.getSource("parks");
       if (src) src.setData(parksFC());
@@ -2422,9 +2427,9 @@ setInterval(loadRadar, 720000);
       MNR.busy = false;
       if (btn) { btn.classList.remove("spin"); btn.disabled = false; }
       var t = new Date().toLocaleTimeString("zh-HK", {hour12: false});
-      toast(okp || okm
-        ? "已更新 " + t + " · 停車場 " + num(PKL.n) + " 個 · 空置咪錶 " + num((ST.live && ST.live.vacant) || 0) + " 個"
-        : "更新失敗，請檢查網絡後再試");
+      toast((okp === false || okm === false)
+        ? "更新失敗，請檢查網絡後再試"
+        : "已更新 " + t + " · 停車場 " + num(PKL.n) + " 個 · 空置咪錶 " + num((ST.live && ST.live.vacant) || 0) + " 個");
     };
     var fin = false;
     Promise.all([pkLive(true), liveOnce()]).then(function(r){
