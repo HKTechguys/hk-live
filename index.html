@@ -1286,7 +1286,7 @@ setInterval(loadRadar, 720000);
   function parksFC(){
     return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
       return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
-        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"",
+        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"", oldp:p.oldp?1:0,
           cls: p.v < 0 ? "x" : p.v >= 20 ? "a" : p.v >= 5 ? "b" : p.v >= 1 ? "c" : "d"}};
     })};
   }
@@ -1607,7 +1607,7 @@ setInterval(loadRadar, 720000);
     var map = ST.map, p = e.features[0].properties;
     var lnglat = e.features[0].geometry.coordinates;
     var v = Number(p.v);
-    var tag = v < 0 ? "今次無實時讀數" : v > 0 ? "有空位" : "已滿";
+    var tag = v < 0 ? (p.u ? "有時間戳但無實時空位" : "只有位置，無實時車位") : v > 0 ? "有空位" : "已滿";
     new maplibregl.Popup({maxWidth:"300px"}).setLngLat(lnglat)
       .setHTML('<div class="pp"><h4>'+esc(p.n)+'</h4>'
         + '<div class="sub">'+esc(p.d)+(p.a ? " · "+esc(p.a) : "")+'</div>'
@@ -1615,7 +1615,9 @@ setInterval(loadRadar, 720000);
         + (v < 0 ? "—" : v)+'</span></div>'
         + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
         + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
-        + '<div class="row"><span>更新</span><span>'+esc(p.u ? String(p.u).replace("T"," ").slice(0,16) : (ST.pm.last_update||""))+'</span></div>'
+        + '<div class="row"><span>更新</span><span>'+(p.u
+            ? esc(String(p.u).slice(0,24)) + (p.oldp ? ' <em style="font-style:normal;color:#8fa3ad">· 較舊</em>' : "")
+            : "無實時數據")+'</span></div>'
         + '<span class="tag" style="background:rgba(84,216,196,.12);color:'+valColor(v)+'">'+tag+'</span>'
         + actBtns(p.a || p.d, lnglat[1], lnglat[0]) + '</div>')
       .addTo(map);
@@ -2348,6 +2350,12 @@ setInterval(loadRadar, 720000);
 
   /* ---------- 全港停車場（香港出行易圖層經 Worker 代理，含非運輸署場） ---------- */
   var PKL = {busy:false, at:0, n:0};
+  /* 出行易回傳 UTC（...T08:26:30Z），顯示要轉香港時間 */
+  function hkT(s){
+    var t = Date.parse(s || "");
+    if (!t) return "";
+    return new Date(t + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+  }
   function pkRows2Parks(rows){
     var o = [], i, r;
     for (i = 0; i < rows.length; i++){
@@ -2355,7 +2363,8 @@ setInterval(loadRadar, 720000);
       if (!r || !r[3] || !r[4]) continue;
       o.push({id:String(r[0]), n:r[1] || "停車場", a:r[2] || "", d:r[6] || "",
         la:r[3], lo:r[4], v:(typeof r[5] === "number" ? r[5] : -1),
-        vd:0, h:r[7] || 0, u:r[8] || ""});
+        vd:0, h:r[7] || 0, u:hkT(r[8]),
+        oldp: !!r[8] && Date.now() - Date.parse(r[8]) > 3600000});
     }
     return o;
   }
@@ -2366,6 +2375,14 @@ setInterval(loadRadar, 720000);
       PKL.busy = false;
       if (!d || !d.rows || !d.rows.length) return;
       ST.parks = pkRows2Parks(d.rows); PKL.at = d.at || Date.now(); PKL.n = ST.parks.length;
+      /* 出行易無讀數嘅場，用返運輸署靜態快照（標記較舊，唔扮即時） */
+      var snap = {}, i0, sp = ST.parksStatic || [];
+      for (i0 = 0; i0 < sp.length; i0++) snap[sp[i0].id] = sp[i0];
+      for (i0 = 0; i0 < ST.parks.length; i0++) {
+        var q = ST.parks[i0];
+        if (q.v >= 0 || !snap[q.id] || snap[q.id].v < 0) continue;
+        q.v = snap[q.id].v; q.u = (ST.pm.generated || ST.pm.last_update || "") + "（運輸署快照）"; q.oldp = 1;
+      }
       var src = ST.map && ST.map.getSource("parks");
       if (src) src.setData(parksFC());
       var total = 0, open = 0, i, p;
@@ -2389,7 +2406,7 @@ setInterval(loadRadar, 720000);
       fetch("data/trails.json"+bust).then(function(r){ return r.json(); })
     ]).then(function(res){
       var pk = res[0], mt = res[1], fc = res[2], tr = res[3];
-      ST.parks = pk.parks || []; ST.meters = mt.spaces || [];
+      ST.parks = pk.parks || []; ST.parksStatic = pk.parks || []; ST.meters = mt.spaces || [];
       ST.cafes = fc.cafes || []; ST.trails = tr.trails || []; ST.posts = tr.posts || [];
       ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
       MI.cache = null;
