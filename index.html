@@ -2581,10 +2581,11 @@ setInterval(loadRadar, 720000);
     for (i = 0; i < arr.length; i++){
       p = arr[i]; e = fee[p.id];
       if (!e) continue;
-      if (!p.f && e.t){ p.f = e.t; p.fs = e.s || ""; n++; }
-      if (!p.fh && e.h){ p.fh = e.h; n++; }
+      var off = (e.s === "越秀");   // 越秀官網價優先蓋過出行易文字
+      if (e.t && (off || !p.f)){ p.f = e.t; p.fs = e.s || ""; n++; }
+      if (e.h && (off || !p.fh)){ p.fh = e.h; n++; }
       if (!p.fw && e.w){ p.fw = e.w; n++; }
-      if (!p.phh && e.hh){ p.phh = e.hh; p.pnh = e.nh || 0; p.pne = e.ne || 0; n++; }
+      if (e.hh && (off || !p.phh)){ p.phh = e.hh; p.pnh = e.nh || 0; p.pne = e.ne || 0; n++; }
     }
     if (n && ST.map){ var s = ST.map.getSource("parks"); if (s) s.setData(parksFC()); }
   }

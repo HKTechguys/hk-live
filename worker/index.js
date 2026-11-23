@@ -109,41 +109,41 @@ function feeText(s) {
 function feeRate(s) {
   const o = { h: 0, w: 0, nh: 0, ne: 0, hh: 0 };
   if (!s) return o;
-  /* 只在「時租」段落內找價，避免抓到日泊／夜泊／24 小時最高收費 */
-  let seg = s;
-  const i = s.search(/時租|hourly/i);
-  if (i >= 0) {
-    const tail = s.slice(i);
-    const mEnd = tail.match(/日泊|夜泊|24\s*小時|月租|季租|泊車轉乘/i);
-    seg = mEnd ? tail.slice(0, mEnd.index) : tail;
-  }
   const ok = (v) => (v > 0 && v < 500 ? v : 0);
-  // 先睇有冇時段：(07:00-23:00) $21／(23:00-07:00) $17
+  const x2 = (txt) => (/半\s*小時/.test(txt) ? 2 : 1);
+  /* 時租段：切走日泊／夜泊／24 小時／月租等套票，同埋星期六日段（另計週末價） */
+  let pre = s;
+  const cut = s.search(/日泊|夜泊|24\s*小時|月租|季租|泊車轉乘|日租|長期停放|星期六|六日|禮拜六/);
+  if (cut >= 0) pre = s.slice(0, cut);
+  // 有時段：(07:00-23:00) $21／(23:00-07:00) 每半小時 $4
   const slots = [];
-  const re = /([01]?\d|2[0-3]):([0-5]\d)\s*[-–~至]\s*([01]?\d|2[0-3]):([0-5]\d)[^$0-9]{0,24}(?:HK)?\$\s*(\d+(?:\.\d+)?)/g;
+  const re = /([01]?\d|2[0-3])\s*:\s*([0-5]\d)\s*[-–~至]\s*([01]?\d|2[0-3])\s*:\s*([0-5]\d)[^$\d]{0,30}?\$\s*(\d+(?:\.\d+)?)/g;
   let ms;
-  while ((ms = re.exec(seg))) slots.push({ a: +ms[1], b: +ms[3], v: ok(+ms[5]) });
-  for (const sl of slots) {
-    if (sl.a >= 20 || sl.b <= 10) { // 夜間時段（跨午夜或凌晨結束）
-      if (!o.hh) { o.hh = sl.v; o.nh = sl.a; o.ne = sl.b; }
-    } else if (!o.h) o.h = sl.v;
+  while ((ms = re.exec(pre))) {
+    const near = pre.slice(ms.index, ms.index + ms[0].length + 18);
+    slots.push({ a: +ms[1], b: +ms[3], v: ok(+ms[5] * x2(near)) });
   }
-  // 週末／假期價（星期六日、六日及公眾假期）
-  const we = s.match(/(?:星期六|六日|禮拜六)[\s\S]{0,40}?\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*)?(?:每)?\s*小時/);
-  if (we) o.w = ok(+we[1]);
-  if (o.h) return o;
-  let m;
-  // 首一小時 $35
-  m = seg.match(/首[^0-9$]{0,3}小時\s*[：:]?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/);
-  if (m) { o.h = ok(+m[1]); return o; }
-  // $21/每小時、$4/半小時
-  m = seg.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/|／)\s*(?:每)?\s*(半小時|小時|鐘|hr)/i);
-  if (m) { o.h = ok(+m[1] * (/半小時|鐘/.test(m[2]) ? 2 : 1)); return o; }
-  // 每小時 $21、每小時收費 HK$18
-  m = seg.match(/(?:每小時|每\s*小時)\s*(?:收費)?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/i);
-  if (m) { o.h = ok(+m[1]); return o; }
-  // 有時租段落但冇單位：用段落內第一個數
-  if (i >= 0) { m = seg.match(/\$\s*(\d+(?:\.\d+)?)/); if (m) o.h = ok(+m[1]); }
+  for (const sl of slots) {
+    if (sl.a >= 20 || sl.b <= 10) { if (!o.hh) { o.hh = sl.v; o.nh = sl.a; o.ne = sl.b; } }
+    else if (!o.h) o.h = sl.v;
+  }
+  if (!o.h) {
+    let m;
+    // 首一小時 $35
+    m = pre.match(/首[^0-9$]{0,4}小時[^$]{0,8}\$\s*(\d+(?:\.\d+)?)/);
+    // $21/每小時、每半小時 $10
+    if (!m) m = pre.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/|／)?\s*(?:每)?\s*(半小時|小時|鐘|hr)/i);
+    if (!m) m = pre.match(/(?:每小時|每\s*小時|每半小時)\s*(?:收費)?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/i);
+    if (!m && pre) { const q = pre.match(/\$\s*(\d+(?:\.\d+)?)/); if (q) o.h = ok(+q[1]); }
+    if (m) o.h = ok(+m[1] * x2(m[0]));
+  }
+  // 週末／假期價：由「星期六」起到之後第一個價（±18 字內有「半小時」就 ×2）
+  const wi = s.search(/星期六|六日|禮拜六/);
+  if (wi >= 0) {
+    const wseg = s.slice(wi, wi + 200);
+    const wm = wseg.match(/\$\s*(\d+(?:\.\d+)?)/);
+    if (wm) o.w = ok(+wm[1] * x2(wseg.slice(0, wm.index + 26)));
+  }
   return o;
 }
 async function hkemParks(force) {

@@ -324,9 +324,7 @@ def main():
             keys = [yx_map.get(norm(a), []) for a in ALIAS.get(name, [])]
             keys = [k for sub in keys for k in sub]
         for k in keys:
-            if sites[k]["fee"]:      # 出行易已有價就唔蓋，只補冇價嘅場
-                continue
-            fees[k] = got
+            fees[k] = got          # 越秀官網價優先用（結構化：日／夜／時段）
             yx_hit += 1
     print("yuexiu mapped:", yx_hit)
 
