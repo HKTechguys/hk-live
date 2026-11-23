@@ -103,6 +103,57 @@ def link_fee(key):
     }
 
 
+def mtr_fees():
+    """港鐵車站停車場：一頁全站，逐段抓「標準收費」"""
+    html = get("https://www.mtr.com.hk/ch/customer/services/stations_carpark.html",
+               "https://www.mtr.com.hk/")
+    if not html:
+        return {}
+    t = plain(html)
+    heads = [(m.start(), m.group(1)) for m in
+             re.finditer(r"([\u4e00-\u9fa5]{2,7}站)\s*車位數目", t)]
+    out = {}
+    for i, (pos, name) in enumerate(heads):
+        seg = t[pos:(heads[i + 1][0] if i + 1 < len(heads) else pos + 400)]
+        h = hh = 0
+        m = re.search(r"每小時港幣(\d+)元", seg)
+        if m:
+            h = int(m.group(1))
+        else:
+            m2 = re.search(r"每半小時港幣(\d+)元", seg)
+            if m2:
+                h = int(m2.group(1)) * 2
+        m3 = re.search(r"每小時港幣(\d+)元\s*[–\-]\s*只限星期六", seg)
+        if m3:
+            hh = int(m3.group(1))
+        if h:
+            out[name] = {"h": h, "hh": hh}
+    print("mtr stations:", len(out))
+    return out
+
+
+def apt_fees():
+    """機場停車場時租表（一號／三號／四號）"""
+    html = get("https://www.hongkongairport.com/tc/transport/parking/parking-charges.page",
+               "https://www.hongkongairport.com/")
+    if not html:
+        return {}
+    t = plain(html)
+    out = {}
+    m = re.search(r"首一小時：\$(\d+)\s*其後每小時：\$(\d+)", t)
+    if m:
+        out["一號"] = {"h": int(m.group(1)), "hh": 0,
+                    "t": f"時租 首小時 ${m.group(1)}／其後 ${m.group(2)}"}
+    m2 = re.search(r"其後每小時：\$(\d+)\s+\$(\d+)\s+\$(\d+)", t)
+    if m2:
+        out.setdefault("三號", {"h": int(m2.group(2)), "hh": 0,
+                               "t": f"時租 ${m2.group(2)}/小時"})
+        out.setdefault("四號", {"h": int(m2.group(3)), "hh": 0,
+                               "t": f"時租 ${m2.group(3)}/小時"})
+    print("airport parks:", len(out))
+    return out
+
+
 def main():
     raw = get(HKEM, "https://www.hkemobility.gov.hk/tc/")
     if not raw:
@@ -117,7 +168,7 @@ def main():
             continue
         key = p.get("EPARK_ID") or pid
         if key not in sites:
-            sites[key] = {"web": "", "fee": ""}
+            sites[key] = {"web": "", "fee": "", "n": (p.get("NAME") or "").strip()}
         w = (p.get("WEBSITE") or "").strip()
         if w and not sites[key]["web"]:
             sites[key]["web"] = w
@@ -127,6 +178,7 @@ def main():
 
     link_ids = [k for k, v in sites.items()
                 if re.search(r"linkhk\.com/\w+/parking/\d+", v["web"])]
+    names = {k: v["n"] for k, v in sites.items()}
     print("link parks:", len(link_ids))
     for i, k in enumerate(link_ids):
         m = re.search(r"/parking/(\d+)", sites[k]["web"])
@@ -137,7 +189,42 @@ def main():
             print(f"  {i}/{len(link_ids)} ok={len(fees)}")
         time.sleep(0.25)
 
-    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk",
+    # 港鐵：按站名對回停車場名（「港鐵香港站停車場」含「香港站」）
+    mtr = mtr_fees()
+    mtr_hit = 0
+    for k, v in sites.items():
+        if "mtr.com.hk" not in v["web"] or v["fee"]:
+            continue
+        nm = ""
+        # 用 park id 反查名稱要靠 features，先建 names
+        nm = names.get(k, "")
+        for st in sorted(mtr, key=len, reverse=True):
+            core = st[:-1]
+            if st in nm or core in nm:
+                e = mtr[st]
+                fees[k] = {"t": f"時租 ${e['h']}/小時" + (f"（假日 ${e['hh']}）" if e["hh"] else ""),
+                           "h": e["h"], "hh": e["hh"], "d12": 0, "d24": 0,
+                           "s": "港鐵", "u": time.strftime("%Y-%m-%d")}
+                mtr_hit += 1
+                break
+    print("mtr mapped:", mtr_hit)
+
+    # 機場：按名含「一號／三號／四號」
+    apt = apt_fees()
+    apt_hit = 0
+    for k, v in sites.items():
+        if "hongkongairport.com" not in v["web"] or v["fee"]:
+            continue
+        nm = names.get(k, "")
+        for tag, e in apt.items():
+            if tag in nm:
+                fees[k] = {"t": e["t"], "h": e["h"], "hh": 0, "d12": 0, "d24": 0,
+                           "s": "機管局", "u": time.strftime("%Y-%m-%d")}
+                apt_hit += 1
+                break
+    print("airport mapped:", apt_hit)
+
+    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+apt",
            "n": len(fees), "fees": fees}
     with open("data/park_fees.json", "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))

@@ -9,6 +9,11 @@ crons = ["*/2 * * * *"]
 binding = "PUSH_KV"
 id = "75abaa0bb3104488aee4125604971b82"
 
+[[d1_databases]]
+binding = "FEE_DB"
+database_name = "hk-live-fees"
+database_id = "7823e6b2-b3be-4007-b5f8-6daa3feeb25a"
+
 [vars]
 VAPID_PUBLIC = "BFbmewABPMJeUHv7xBwMWgmQE1Kv1narvc1Ad6jV3xu9AZ-PAJ7nrECe97BvsWpogQbx6sAE39eaeS2ZtoMVv-A"
 VAPID_SUBJECT = "mailto:hk-live@example.com"

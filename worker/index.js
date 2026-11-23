@@ -30,8 +30,23 @@ async function handle(req, env) {
       return out({ ok: true, subs: l.keys.length });
     }
     // 香港出行易停車場全量（1,654 個場，含非運輸署場；有實時空位就用 VACANCY）
-    if (url.pathname === "/parks") return out(await hkemParks(!!url.searchParams.get("t")));
+    if (url.pathname === "/parks") {
+      const d = await hkemParks(!!url.searchParams.get("t"));
+      return out({ at: d.at, rows: d.rows, uf: await userFees(env) });
+    }
     const b = req.method === "POST" ? await req.json().catch(() => null) : null;
+    /* 用戶回報收費：{id, h} → KV fee:<id>，之後 /parks 一齊回 */
+    if (url.pathname === "/fee" && req.method === "POST") {
+      if (!b || !b.id) return out({ error: "missing id" }, 400);
+      const h = Math.round(Number(b.h));
+      if (!(h > 0 && h <= 3000)) return out({ error: "bad h" }, 400);
+      const rec = { h, t: String(b.t || "").slice(0, 48),
+        at: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ") };
+      await env.FEE_DB.prepare("INSERT OR REPLACE INTO fee(id,h,t,at) VALUES(?,?,?,?)")
+        .bind(String(b.id).slice(0, 40), h, rec.t, rec.at).run();
+      FEEC.at = 0;
+      return out({ ok: true, rec });
+    }
     if (url.pathname === "/subscribe") {
       if (!b || !b.endpoint || !b.sub) return out({ error: "missing" }, 400);
       await env.PUSH_KV.put("sub:" + b.endpoint,
@@ -60,6 +75,21 @@ async function handle(req, env) {
     return out({ error: String(e) }, 500);
   }
   return out({ error: "not found" }, 404);
+}
+
+/* ---------- 用戶回報收費（D1，60 秒記憶體快取；KV 免費額度得 1,000 寫入/日唔夠用） ---------- */
+let FEEC = { at: 0, o: {} };
+async function userFees(env) {
+  if (Date.now() - FEEC.at < 60000) return FEEC.o;
+  const o = {};
+  try {
+    const r = await env.FEE_DB.prepare("SELECT id,h,t,at FROM fee LIMIT 5000").all();
+    for (const row of (r.results || [])) o[row.id] = { h: row.h, t: row.t, at: row.at };
+  } catch (e) {
+    return FEEC.o;
+  }
+  FEEC = { at: Date.now(), o };
+  return o;
 }
 
 /* ---------- 停車場（香港出行易 DRSS 圖層，需 Referer 才過 403） ---------- */
