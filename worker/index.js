@@ -108,13 +108,28 @@ function feeText(s) {
 }
 function feeHourly(s) {
   if (!s) return 0;
-  let m = s.match(/(?:每小時|每\s*小時|hourly)[^0-9$]{0,8}(?:HK)?\$?\s*(\d+(?:\.\d+)?)/i)
-    || s.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:半小時|半個鐘))/)
-    || s.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:小時|hr))?/);
-  if (!m) return 0;
-  let v = +m[1];
-  if (/半小時|半個鐘/.test(m[0]) && !/每小時/.test(m[0])) v *= 2;
-  return v > 0 && v < 500 ? v : 0;
+  /* 只在「時租」段落內找價，避免抓到日泊／夜泊／24 小時最高收費 */
+  let seg = s;
+  const i = s.search(/時租|hourly/i);
+  if (i >= 0) {
+    const tail = s.slice(i);
+    const mEnd = tail.match(/日泊|夜泊|24\s*小時|月租|季租|泊車轉乘/i);
+    seg = mEnd ? tail.slice(0, mEnd.index) : tail;
+  }
+  const ok = (v) => (v > 0 && v < 500 ? v : 0);
+  let m;
+  // 首一小時 $35
+  m = seg.match(/首[^0-9$]{0,3}小時\s*[：:]?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/);
+  if (m) return ok(+m[1]);
+  // $21/每小時、$4/半小時
+  m = seg.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/|／)\s*(?:每)?\s*(半小時|小時|鐘|hr)/i);
+  if (m) return ok(+m[1] * (/半小時|鐘/.test(m[2]) ? 2 : 1));
+  // 每小時 $21、每小時收費 HK$18
+  m = seg.match(/(?:每小時|每\s*小時)\s*(?:收費)?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/i);
+  if (m) return ok(+m[1]);
+  // 有時租段落但冇單位：用段落內第一個數
+  if (i >= 0) { m = seg.match(/\$\s*(\d+(?:\.\d+)?)/); if (m) return ok(+m[1]); }
+  return 0;
 }
 async function hkemParks(force) {
   if (!force && PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
