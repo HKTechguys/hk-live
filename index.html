@@ -337,6 +337,8 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 }
 .cf-search #cf-park[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45);background:rgba(84,216,196,.1)}
 .cf-park{font-size:11.5px;color:var(--teal);margin-top:7px;line-height:1.5}
+.cf-park.mt{color:#ffd166;margin-top:4px}
+.cf-park.mt b{font-weight:600}
 .cf-count{font-size:11px;color:var(--dim);margin:6px 0 10px}
 .cf-list{display:flex;flex-direction:column;gap:9px}
 .cf-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
@@ -1025,7 +1027,7 @@ setInterval(loadRadar, 720000);
     <div class="cf-search">
       <input id="cf-q" type="search" aria-label="搜尋 Cafe 店名或街道" placeholder="店名／街道／地區">
       <select id="cf-dist"><option value="">全部地區</option></select>
-      <button id="cf-park" aria-pressed="false">🅿 150 米內有停車場</button>
+      <button id="cf-park" aria-pressed="false">🅿 150 米內有車位</button>
     </div>
     <div class="cf-count" id="cf-count"></div>
     <div class="cf-list" id="cf-list"></div>
@@ -1879,7 +1881,7 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- cafe list ---------- */
-  var CF = {q:"", dist:"", shown:0, size:24, rows:[], park:false, pc:{}};
+  var CF = {q:"", dist:"", shown:0, size:24, rows:[], park:false, pc:{}, mc:{}};
   /* 最近停車場（直線 150 米內，約行 2 分鐘），緯度 111000 / 經度 103000 米估算 */
   var PKNEAR = 150;
   function nearPark(c){
@@ -1897,6 +1899,44 @@ setInterval(loadRadar, 720000);
     CF.pc[key] = res;
     return res;
   }
+  /* 咪錶位：0.002° 網格索引（私家車 A），每間店只查周圍 9 格 */
+  var MG = {cells:null};
+  function meterCells(){
+    if (MG.cells) return MG.cells;
+    var cells = {}, arr = ST.meters || [], i, m, k;
+    for (i = 0; i < arr.length; i++) {
+      m = arr[i];
+      if (m[6] && m[6] !== "A") continue;
+      k = Math.floor(m[1] / 0.002) + "_" + Math.floor(m[2] / 0.002);
+      if (!cells[k]) cells[k] = [];
+      cells[k].push(m);
+    }
+    MG.cells = cells;
+    return cells;
+  }
+  function nearMeters(c){
+    var key = c.s || c.n;
+    if (CF.mc[key] !== undefined) return CF.mc[key];
+    var cells = meterCells(), cx = Math.floor(c.la / 0.002), cy = Math.floor(c.lo / 0.002);
+    var best = PKNEAR * PKNEAR, nearBest = best, n = 0, vac = 0, unk = 0, x, y, list, i, m, dy, dx, d;
+    for (x = cx - 1; x <= cx + 1; x++) {
+      for (y = cy - 1; y <= cy + 1; y++) {
+        list = cells[x + "_" + y];
+        if (!list) continue;
+        for (i = 0; i < list.length; i++) {
+          m = list[i];
+          dy = (c.la - m[1]) * 111000; dx = (c.lo - m[2]) * 103000; d = dy * dy + dx * dx;
+          if (d > best) continue;
+          n++;
+          if (m[3] === 0) vac++; else if (m[3] < 0) unk++;
+          if (d < nearBest) nearBest = d;
+        }
+      }
+    }
+    var res = n ? {n: n, vac: vac, unk: unk, d: Math.round(Math.sqrt(nearBest))} : null;
+    CF.mc[key] = res;
+    return res;
+  }
   function renderCafes(){
     var list = document.getElementById("cf-list");
     var cnt = document.getElementById("cf-count");
@@ -1904,24 +1944,26 @@ setInterval(loadRadar, 720000);
     var v = CF.q.trim().toLowerCase();
     CF.rows = ST.cafes.filter(function(c){
       if (CF.dist && c.d !== CF.dist) return false;
-      if (CF.park && !nearPark(c)) return false;
+      if (CF.park && !nearPark(c) && !nearMeters(c)) return false;
       if (!v) return true;
       return ((c.n+" "+c.a+" "+c.d)||"").toLowerCase().indexOf(v) >= 0;
     });
     var pk = 0;
-    ST.cafes.forEach(function(c){ if (nearPark(c)) pk++; });
+    ST.cafes.forEach(function(c){ if (nearPark(c) || nearMeters(c)) pk++; });
     cnt.textContent = "共 " + CF.rows.length + " 間" + (CF.dist ? "（" + CF.dist + "）" : "")
-      + " · 全港 " + pk + " 間 " + PKNEAR + " 米內有停車場";
+      + " · 全港 " + pk + " 間 " + PKNEAR + " 米內有車位（停車場／咪錶）";
     var slice = CF.rows.slice(0, CF.shown + CF.size);
     CF.shown = slice.length;
     list.innerHTML = slice.map(function(c){
       var mono = esc((c.n||"?").trim().charAt(0));
-      var np = nearPark(c);
+      var np = nearPark(c), nm = nearMeters(c);
       return '<div class="cf-card">'
         + '<div class="cf-head"><div class="cf-mono">'+mono+'</div>'
         + '<div class="t"><h3>'+esc(c.n)+'</h3>'
         + '<div class="sub">'+esc(c.d||"")+(c.a ? " · "+esc(c.a) : "")+'</div></div></div>'
         + (np ? '<div class="cf-park">🅿 '+esc(np.n)+' · 約 '+np.d+' 米</div>' : "")
+        + (nm ? '<div class="cf-park mt">⏱ 咪錶 '+nm.n+' 個 · 最近約 '+nm.d+' 米'
+            + (nm.vac ? ' · <b>現時 '+nm.vac+' 個有位</b>' : nm.unk === nm.n ? ' · 暫無讀數' : ' · 現時全滿')+'</div>' : "")
         + (c.h ? '<div class="cf-hours">'+esc(c.h)+'</div>' : "")
         + (c.x ? '<div class="cf-x">'+esc(c.x)+'</div>' : "")
         + '<div class="cf-actions">'
@@ -2296,6 +2338,8 @@ setInterval(loadRadar, 720000);
     }
     LIVE.at = liveTime();
     MI.cache = null;
+    CF.mc = {};
+    if (document.getElementById("p-cafe") && document.getElementById("p-cafe").classList.contains("on")) renderCafes();
     ST.live = {at: LIVE.at, rows: n, vacant: seenVac};
     if (ST.mm) ST.mm.last_update = "即時 " + LIVE.at;
     var sm = document.getElementById("s-meter");
