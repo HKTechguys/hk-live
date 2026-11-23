@@ -296,6 +296,13 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 }
 .sheet .inner{max-width:640px;margin:0 auto;padding:12px 16px 30px}
 .sheet-sub{font-size:11px;color:var(--dim);margin:0 0 10px;line-height:1.6}
+/* 免責聲明 */
+.about-btn{font:inherit;font-size:10.5px;color:var(--dim);background:none;border:0;padding:0;
+  margin-top:5px;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.about-btn:hover{color:var(--teal)}
+.about-p{font-size:12.5px;line-height:1.75;color:#c9d6de;margin:0 0 12px}
+.about-sub{font-size:11px;line-height:1.7;color:var(--dim);margin:14px 0 0;
+  padding-top:10px;border-top:1px solid var(--line)}
 
 /* ---------- 山徑清單 ---------- */
 .tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
@@ -960,7 +967,8 @@ setInterval(loadRadar, 720000);
     <s style="background:#ff6b78"></s>已滿（0）<br>
     <s style="background:#3a4757"></s>今次無讀數<br>
     <span class="ce"></span>Cafe 咖啡店（可切換）<br>
-    <span style="color:#8fa3ad">咪錶位需 zoom ≥ 13 才顯示</span>
+    <span style="color:#8fa3ad">咪錶位需 zoom ≥ 13 才顯示</span><br>
+    <button type="button" id="open-about" class="about-btn">資料來源與免責聲明</button>
   </div>
 
   <div class="hk-install" id="hk-install" hidden>
@@ -1048,6 +1056,18 @@ setInterval(loadRadar, 720000);
       資料為事實欄位（店名／地址／座標／營業時間）＋原文節錄 1–2 句，每張卡連回原站。
       <b>不含照片、不含店舖標誌</b>。營業時間以店舖公布為準，出發前請再確認。
     </div>
+  </div>
+</section>
+
+<section class="sheet" id="p-about">
+  <div class="sheet-head">
+    <h2>資料來源與免責聲明</h2>
+    <button class="sheet-close" data-close="p-about">收起</button>
+  </div>
+  <div class="inner">
+    <p class="about-p">資料由政府公開資料提供,以停車場實際為準。本手機應用程式資料只供參考之用,並不保證所列資料的準確性及可靠性。</p>
+    <p class="about-p">如你使用有關資料而引致任何損失,汽車台概不承擔任何責任。</p>
+    <p class="about-sub">資料來源：香港出行易（hkemobility.gov.hk）DRSS 停車場圖層、運輸署實時車位、領展／港鐵／機管局公布收費、用戶回報收費，以及漁護署山徑圖層。</p>
   </div>
 </section>
 <script src="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -1178,6 +1198,7 @@ setInterval(loadRadar, 720000);
   });
   document.getElementById("open-trail").addEventListener("click", function(){ openSheet("p-trail"); });
   document.getElementById("open-cafe").addEventListener("click", function(){ openSheet("p-cafe"); });
+  document.getElementById("open-about").addEventListener("click", function(){ openSheet("p-about"); });
 
   /* ---------- map ---------- */
   var MAP_STYLE = {
