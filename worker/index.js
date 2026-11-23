@@ -30,7 +30,7 @@ async function handle(req, env) {
       return out({ ok: true, subs: l.keys.length });
     }
     // 香港出行易停車場全量（1,654 個場，含非運輸署場；有實時空位就用 VACANCY）
-    if (url.pathname === "/parks") return out(await hkemParks());
+    if (url.pathname === "/parks") return out(await hkemParks(!!url.searchParams.get("t")));
     const b = req.method === "POST" ? await req.json().catch(() => null) : null;
     if (url.pathname === "/subscribe") {
       if (!b || !b.endpoint || !b.sub) return out({ error: "missing" }, 400);
@@ -67,8 +67,8 @@ const HKEM = "https://www.hkemobility.gov.hk/api/drss/layer/map/"
   + "?typeName=DRSS%3AVW_CAR_PARK_TC&service=WFS&version=1.0.0&request=GetFeature"
   + "&outputFormat=application%2Fjson&srsName=EPSG%3A4326";
 let PARKC = { at: 0, rows: null };
-async function hkemParks() {
-  if (PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
+async function hkemParks(force) {
+  if (!force && PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
   const r = await fetch(HKEM, { headers: {
     Referer: "https://www.hkemobility.gov.hk/tc/",
     Origin: "https://www.hkemobility.gov.hk",

@@ -450,6 +450,13 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .maplibregl-ctrl-attrib{background:rgba(7,10,16,.8)!important;font-size:10px!important}
 .maplibregl-ctrl-attrib a{color:#8fa3ad!important}
 .maplibregl-ctrl-top-left{top:calc(var(--tabh) + 66px);left:10px}
+.pk-rf{width:29px;height:29px;line-height:1;font-size:15px;color:#cfe0e6;background:transparent;
+  border:0;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent}
+.pk-rf:active{background:rgba(84,216,196,.14)}
+.pk-rf.spin{animation:rfspin .9s linear infinite;color:var(--teal)}
+@keyframes rfspin{to{transform:rotate(360deg)}}
+.pk-rf[disabled]{opacity:.55}
 
 @media (max-width:520px){
   .tabbar button{font-size:12.5px;padding:6px 11px}
@@ -1177,6 +1184,7 @@ setInterval(loadRadar, 720000);
     });
     map.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-left");
     map.addControl(new maplibregl.GeolocateControl({trackUserLocation:false}), "top-left");
+    addRefreshCtrl(map);
     map.addControl(new maplibregl.AttributionControl({compact:true}), "bottom-left");
     map.on("style.load", function(){ drawLayers(map); });
     map.on("load", function(){ drawLayers(map); });
@@ -2368,12 +2376,13 @@ setInterval(loadRadar, 720000);
     }
     return o;
   }
-  function pkLive(){
-    if (PKL.busy || !PUSH.api) return;
+  function pkLive(force){
+    if (!PUSH.api) return Promise.resolve(false);
+    if (PKL.busy) return Promise.resolve(false);
     PKL.busy = true;
-    fetch(PUSH.api + "/parks").then(function(r){ return r.json(); }).then(function(d){
+    return fetch(PUSH.api + "/parks" + (force ? "?t=" + Date.now() : "")).then(function(r){ return r.json(); }).then(function(d){
       PKL.busy = false;
-      if (!d || !d.rows || !d.rows.length) return;
+      if (!d || !d.rows || !d.rows.length) return false;
       ST.parks = pkRows2Parks(d.rows); PKL.at = d.at || Date.now(); PKL.n = ST.parks.length;
       /* 出行易無讀數嘅場，用返運輸署靜態快照（標記較舊，唔扮即時） */
       var snap = {}, i0, sp = ST.parksStatic || [];
@@ -2393,7 +2402,52 @@ setInterval(loadRadar, 720000);
       if (so) so.textContent = open + " / " + ST.parks.length;
       if (stt) stt.textContent = new Date(PKL.at).toLocaleTimeString("zh-HK", {hour12:false});
       if (tb) tb.textContent = "停車場 " + ST.parks.length.toLocaleString();
-    }).catch(function(){ PKL.busy = false; });
+      return true;
+    }).catch(function(){ PKL.busy = false; return false; });
+  }
+
+  /* 手動更新：一次過重拉出行易停車場 + 運輸署咪錶（地圖左上 ↻） */
+  var MNR = {busy: false};
+  function liveOnce(){
+    return new Promise(function(res){
+      if (LIVE.busy) { LIVE.cbs.push(res); return; }
+      livePull(function(ok){ res(ok); }, true);
+    });
+  }
+  function manualRefresh(btn){
+    if (MNR.busy) return;
+    MNR.busy = true;
+    if (btn) { btn.classList.add("spin"); btn.disabled = true; }
+    var done = function(okp, okm){
+      MNR.busy = false;
+      if (btn) { btn.classList.remove("spin"); btn.disabled = false; }
+      var t = new Date().toLocaleTimeString("zh-HK", {hour12: false});
+      toast(okp || okm
+        ? "已更新 " + t + " · 停車場 " + num(PKL.n) + " 個 · 空置咪錶 " + num((ST.live && ST.live.vacant) || 0) + " 個"
+        : "更新失敗，請檢查網絡後再試");
+    };
+    var fin = false;
+    Promise.all([pkLive(true), liveOnce()]).then(function(r){
+      if (fin) return; fin = true; done(r[0], r[1]);
+    }).catch(function(){ if (!fin) { fin = true; done(false, false); } });
+    setTimeout(function(){ if (!fin) { fin = true; done(); } }, 25000);
+  }
+  function addRefreshCtrl(map){
+    var b = document.createElement("button");
+    b.type = "button"; b.id = "pk-rf"; b.className = "pk-rf";
+    b.setAttribute("aria-label", "立即更新資料");
+    b.textContent = "↻";
+    b.addEventListener("click", function(){ manualRefresh(b); });
+    var c = {
+      onAdd: function(){
+        var d = document.createElement("div");
+        d.className = "maplibregl-ctrl maplibregl-ctrl-group";
+        d.appendChild(b);
+        return d;
+      },
+      onRemove: function(){ if (b.parentNode) b.parentNode.removeChild(b); }
+    };
+    map.addControl(c, "top-left");
   }
 
   /* ---------- data ---------- */
