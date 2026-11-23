@@ -331,11 +331,13 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
   border:1px solid var(--line);background:#111a22;color:var(--ink);
 }
 .cf-search input{flex:1;min-width:150px}
-.cf-search #cf-park{
+.cf-search #cf-park,.cf-search #cf-mt{
   font:inherit;font-size:12.5px;padding:8px 11px;border-radius:9px;cursor:pointer;
   border:1px solid var(--line);background:#111a22;color:var(--dim);white-space:nowrap;
 }
-.cf-search #cf-park[aria-pressed="true"]{color:var(--teal);border-color:rgba(84,216,196,.45);background:rgba(84,216,196,.1)}
+.cf-search #cf-park[aria-pressed="true"],.cf-search #cf-mt[aria-pressed="true"]{
+  color:var(--teal);border-color:rgba(84,216,196,.45);background:rgba(84,216,196,.1);
+}
 .cf-park{font-size:11.5px;color:var(--teal);margin-top:7px;line-height:1.5}
 .cf-park.mt{color:#ffd166;margin-top:4px}
 .cf-park.mt b{font-weight:600}
@@ -1027,7 +1029,8 @@ setInterval(loadRadar, 720000);
     <div class="cf-search">
       <input id="cf-q" type="search" aria-label="搜尋 Cafe 店名或街道" placeholder="店名／街道／地區">
       <select id="cf-dist"><option value="">全部地區</option></select>
-      <button id="cf-park" aria-pressed="false">🅿 150 米內有車位</button>
+      <button id="cf-park" aria-pressed="false">🅿 200 米內停車場</button>
+      <button id="cf-mt" aria-pressed="false">⏱ 200 米內咪錶</button>
     </div>
     <div class="cf-count" id="cf-count"></div>
     <div class="cf-list" id="cf-list"></div>
@@ -1154,6 +1157,7 @@ setInterval(loadRadar, 720000);
     document.getElementById(id).classList.add("on");
     syncSheetState();
     if (id === "p-meter") liveStart();
+    if (id === "p-cafe") renderCafes();
   }
   function closeSheet(id){
     document.getElementById(id).classList.remove("on");
@@ -1881,9 +1885,9 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- cafe list ---------- */
-  var CF = {q:"", dist:"", shown:0, size:24, rows:[], park:false, pc:{}, mc:{}};
-  /* 最近停車場（直線 150 米內，約行 2 分鐘），緯度 111000 / 經度 103000 米估算 */
-  var PKNEAR = 150;
+  var CF = {q:"", dist:"", shown:0, size:24, rows:[], park:false, mt:false, pc:{}, mc:{}};
+  /* 最近停車場／咪錶（直線 200 米內，緯度 111000 / 經度 103000 米估算） */
+  var PKNEAR = 200;
   function nearPark(c){
     var key = c.s || c.n;
     if (CF.pc[key] !== undefined) return CF.pc[key];
@@ -1944,14 +1948,20 @@ setInterval(loadRadar, 720000);
     var v = CF.q.trim().toLowerCase();
     CF.rows = ST.cafes.filter(function(c){
       if (CF.dist && c.d !== CF.dist) return false;
-      if (CF.park && !nearPark(c) && !nearMeters(c)) return false;
+      if (CF.park && CF.mt) { if (!nearPark(c) && !nearMeters(c)) return false; }
+      else if (CF.park && !nearPark(c)) return false;
+      else if (CF.mt && !nearMeters(c)) return false;
       if (!v) return true;
       return ((c.n+" "+c.a+" "+c.d)||"").toLowerCase().indexOf(v) >= 0;
     });
-    var pk = 0;
-    ST.cafes.forEach(function(c){ if (nearPark(c) || nearMeters(c)) pk++; });
+    var pk = 0, pk2 = 0, mt = 0;
+    ST.cafes.forEach(function(c){
+      var a = nearPark(c), b2 = nearMeters(c);
+      if (a) pk++; if (b2) mt++; if (a || b2) pk2++;
+    });
     cnt.textContent = "共 " + CF.rows.length + " 間" + (CF.dist ? "（" + CF.dist + "）" : "")
-      + " · 全港 " + pk + " 間 " + PKNEAR + " 米內有車位（停車場／咪錶）";
+      + " · 全港 " + pk + " 間 " + PKNEAR + " 米內有停車場、"
+      + mt + " 間有咪錶（合共 " + pk2 + " 間）";
     var slice = CF.rows.slice(0, CF.shown + CF.size);
     CF.shown = slice.length;
     list.innerHTML = slice.map(function(c){
@@ -1998,6 +2008,11 @@ setInterval(loadRadar, 720000);
     document.getElementById("cf-park").addEventListener("click", function(){
       CF.park = !CF.park; CF.shown = 0;
       this.setAttribute("aria-pressed", CF.park ? "true" : "false");
+      renderCafes();
+    });
+    document.getElementById("cf-mt").addEventListener("click", function(){
+      CF.mt = !CF.mt; CF.shown = 0;
+      this.setAttribute("aria-pressed", CF.mt ? "true" : "false");
       renderCafes();
     });
     document.getElementById("cf-more").addEventListener("click", function(){
@@ -2460,13 +2475,18 @@ setInterval(loadRadar, 720000);
     }
     return o;
   }
+  function pkRetry(){
+    if (PKL.t) return;
+    PKL.t = setTimeout(function(){ PKL.t = null; pkLive(); }, 20000);
+  }
   function pkLive(force){
     if (!PUSH.api) return Promise.resolve(false);
     if (PKL.busy) return Promise.resolve(null);
     PKL.busy = true;
     return fetch(PUSH.api + "/parks" + (force ? "?t=" + Date.now() : "")).then(function(r){ return r.json(); }).then(function(d){
       PKL.busy = false;
-      if (!d || !d.rows || !d.rows.length) return false;
+      if (!d || !d.rows || !d.rows.length) { pkRetry(); return false; }
+      if (PKL.t) { clearTimeout(PKL.t); PKL.t = null; }
       ST.parks = pkRows2Parks(d.rows); PKL.at = d.at || Date.now(); PKL.n = ST.parks.length;
       /* 出行易無讀數嘅場，用返運輸署靜態快照（標記較舊，唔扮即時） */
       var snap = {}, i0, sp = ST.parksStatic || [];
@@ -2489,7 +2509,7 @@ setInterval(loadRadar, 720000);
       if (stt) stt.textContent = new Date(PKL.at).toLocaleTimeString("zh-HK", {hour12:false});
       if (tb) tb.textContent = "停車場 " + ST.parks.length.toLocaleString();
       return true;
-    }).catch(function(){ PKL.busy = false; return false; });
+    }).catch(function(){ PKL.busy = false; pkRetry(); return false; });
   }
 
   /* 手動更新：一次過重拉出行易停車場 + 運輸署咪錶（地圖左上 ↻） */
