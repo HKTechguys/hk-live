@@ -1657,7 +1657,7 @@ setInterval(loadRadar, 720000);
         + '<div class="row"><span>車輛種類</span><span>'+esc(vtLabel(q.vt))+'</span></div>'
         + '<div class="row"><span>狀態</span><span style="color:'+(st===1?"#ff6b78":st===0?"#54d8c4":"#8fa3ad")+'">'
         + (st===1?"佔用中":st===0?"空置":"暫無讀數")+'</span></div>'
-        + '<div class="row"><span>更新</span><span>'+esc(ST.mm.last_update||"")+'</span></div>'
+        + '<div class="row"><span>更新</span><span>'+esc(ST.mm.last_update || ST.mm.generated || "")+'</span></div>'
         + actBtns((q.s||"") + (q.d ? "，" + q.d : ""), lnglat[1], lnglat[0])
         + '<div class="pp-act"><button data-wt="'+esc(q.id)+'" data-wtn="'+esc(q.s||"")+'"'
         + (wtHas(q.id) ? ' class="on"' : "") + '>' + (wtHas(q.id) ? "★ 已提醒" : "☆ 有位提示我")
@@ -2180,8 +2180,8 @@ setInterval(loadRadar, 720000);
       livePull();
     }, liveGap());
   }
-  function livePull(cb){
-    if (!LIVE.on) { if (cb) cb(false); return; }
+  function livePull(cb, force){
+    if (!LIVE.on && !force) { if (cb) cb(false); return; }
     if (LIVE.busy) { if (cb) LIVE.cbs.push(cb); return; }
     LIVE.busy = true;
     fetch(LIVE.url + "?t=" + Date.now(), {cache: "no-store"})
@@ -2216,6 +2216,16 @@ setInterval(loadRadar, 720000);
   document.addEventListener("visibilitychange", function(){
     if (LIVE.on && !document.hidden) livePull();
   });
+  /* 唔開咪錶面板都會定時更新佔用狀態（GitHub Action 只跑幾次一日，唔夠新） */
+  var AMB = {timer: null};
+  function ambLoop(){
+    if (AMB.timer) clearTimeout(AMB.timer);
+    AMB.timer = setTimeout(function(){
+      AMB.timer = null;
+      if (!document.hidden && !LIVE.on) livePull(null, true);
+      ambLoop();
+    }, 600000);
+  }
   function liveApply(txt){
     var lines = txt.split("\n"), st = {}, i, n = 0, j, seenVac = 0;
     for (i = 1; i < lines.length; i++) {
@@ -2393,7 +2403,8 @@ setInterval(loadRadar, 720000);
           var o = document.createElement("option"); o.value = d; o.textContent = d; mdist.appendChild(o);
         });
       }
-      if (LIVE.on) livePull(); else wtCheck(ST.meters);
+      if (LIVE.on) livePull(); else { wtCheck(ST.meters); livePull(null, true); }
+      ambLoop();
       if (document.getElementById("p-meter") && document.getElementById("p-meter").classList.contains("on")) renderMeters();
 
       var total = 0, open = 0;

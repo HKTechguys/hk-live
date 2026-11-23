@@ -46,10 +46,39 @@ def hk_now():
     return datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
 
 
+TS_FMTS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y %I:%M:%S %p",
+           "%m/%d/%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S")
+
+
+def ts_parse(s):
+    """運輸署時間字串有兩種格式：vacancy_all.json 用 ISO，occupancystatus.csv 用
+    m/d/Y + 12 小時制。直接字串比較會揀到「12/29/2025」呢類假最大值，所以一律 parse。"""
+    s = (s or "").strip()
+    if not s:
+        return None
+    for f in TS_FMTS:
+        try:
+            return datetime.strptime(s, f)
+        except ValueError:
+            pass
+    return None
+
+
+def ts_max(cur, s):
+    d = ts_parse(s)
+    if d is None:
+        return cur
+    return d if cur is None or d > cur else cur
+
+
+def ts_out(d):
+    return d.strftime("%Y-%m-%d %H:%M:%S") if d else ""
+
+
 basic = {p["park_id"]: p for p in load_json("basic_info_all.json")["car_park"]}
 vac = load_json("vacancy_all.json")["car_park"]
 
-parks, latest = [], ""
+parks, latest = [], None
 for item in vac:
     pid = item.get("park_id")
     base = basic.get(pid)
@@ -65,8 +94,7 @@ for item in vac:
             elif vt.get("type") == "P_D":
                 pcd += int(sc.get("vacancy") or 0)
             ts = sc.get("lastupdate") or ""
-            if ts > latest:
-                latest = ts
+            latest = ts_max(latest, ts)
     lat, lng = base.get("latitude"), base.get("longitude")
     if not lat or not lng:
         continue
@@ -88,21 +116,19 @@ with open(os.path.join(OUT, "parking.json"), "w", encoding="utf-8") as fh:
     json.dump({
         "generated": hk_now(),
         "source": "運輸署 實時停車場空位 (vacancy_all.json / basic_info_all.json)",
-        "last_update": latest,
+        "last_update": ts_out(latest),
         "count": len(parks),
         "parks": parks,
     }, fh, ensure_ascii=False, separators=(",", ":"))
 
 spaces = read_csv("parkingspaces.csv")
-occ, occ_time = {}, ""
+occ, occ_time = {}, None
 for r in read_csv("occupancystatus.csv", skip=0):
     sid = r.get("ParkingSpaceId")
     if not sid:
         continue
     occ[sid] = 1 if (r.get("OccupancyStatus") or "").strip().upper() == "O" else 0
-    ts = r.get("OccupancyDateChanged") or ""
-    if ts > occ_time:
-        occ_time = ts
+    occ_time = ts_max(occ_time, r.get("OccupancyDateChanged") or "")
 
 meters = []
 for r in spaces:
@@ -125,12 +151,12 @@ with open(os.path.join(OUT, "meters.json"), "w", encoding="utf-8") as fh:
     json.dump({
         "generated": hk_now(),
         "source": "運輸署 路邊泊車位位置 + 佔用狀態",
-        "last_update": occ_time,
+        "last_update": ts_out(occ_time),
         "count": len(meters),
         "occupied": sum(1 for m in meters if m[3] == 1),
         "vacant": sum(1 for m in meters if m[3] == 0),
         "spaces": meters,
     }, fh, ensure_ascii=False, separators=(",", ":"))
 
-print("parks: %d (vacancy update %s)" % (len(parks), latest))
+print("parks: %d (vacancy update %s)" % (len(parks), ts_out(latest)))
 print("meters: %d (vacant %d)" % (len(meters), sum(1 for m in meters if m[3] == 0)))
