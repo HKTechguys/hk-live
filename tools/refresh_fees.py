@@ -154,6 +154,80 @@ def apt_fees():
     return out
 
 
+def norm(s):
+    s = (s or "").replace("（", "(").replace("）", ")").replace("　", " ")
+    s = re.sub(r"\s+", "", s)
+    for w in ("停車場", "停車場(時租)", "(時租)", "車場"):
+        s = s.replace(w, "")
+    return s.strip()
+
+
+YX = "https://www.yuexiuaptparking.com"
+
+
+def yuexiu_list():
+    """越秀亞通：6 頁清單 -> [(article_id, name)]"""
+    ids, seen = [], set()
+    for pg in range(1, 7):
+        url = YX + ("/list-find.html?lang=tc" if pg == 1 else f"/list-find.html?page={pg}&lang=tc")
+        html = get(url, YX + "/")
+        if not html:
+            continue
+        for m in re.finditer(r"/article-find-(\d+)\.html", html):
+            i = m.group(1)
+            if i not in seen:
+                seen.add(i)
+                ids.append(i)
+        time.sleep(0.3)
+    print("yuexiu articles:", len(ids))
+    return ids
+
+
+def yuexiu_fee(aid):
+    html = get(f"{YX}/article-find-{aid}.html?lang=tc", YX + "/")
+    if not html:
+        return None, ""
+    mt = re.search(r"<title>(.*?)</title>", html, re.S)
+    name = (mt.group(1).strip() if mt else "")
+    name = re.split(r"[|\-–]", name)[0].strip()
+    t = plain(html)
+    i = t.find("時租")
+    if i < 0:
+        return None, name
+    seg = t[i:i + 160]
+    cut = re.search(r"日\s*泊|24\s*小時|月租", seg)
+    if cut:
+        seg = seg[:cut.start()]
+    # 有時段：(07:00 - 23:00) HK$21 (23:00 - 07:00) HK$17
+    pairs = re.findall(r"(\d{1,2})\s*:\s*(\d{2})\s*[-–~至]\s*(\d{1,2})\s*:\s*(\d{2})[^$\d]{0,24}\$\s*(\d+)", seg)
+    day = night = nh = ne = 0
+    for a, _b, c, e, v in pairs:
+        a, c, v = int(a), int(c), int(v)
+        if (a >= 20 or c <= 10) and night == 0:
+            night, nh, ne = v, a, c
+        elif day == 0:
+            day = v
+    note = ""
+    if not day:
+        # 首2小時 $17、第三小時起 $34
+        m = re.search(r"首\s*(\d+)\s*小時[\s\S]{0,40}?\$\s*(\d+)", seg)
+        if m:
+            day, note = int(m[2]), f"首{m[1]}小時"
+        else:
+            nums = [int(x) for x in re.findall(r"HK\s*\$?\s*(\d+)", seg)]
+            day = nums[0] if nums else 0
+    if not day:
+        return None, name
+    if note:
+        txt = f"{note} ${day}/小時（其後見官網）（越秀官網）"
+    elif night:
+        txt = f"時租 {pairs[0][0]}:{pairs[0][1]}-{pairs[0][2]}:{pairs[0][3]} ${day}／夜間 ${night}（越秀官網）"
+    else:
+        txt = f"時租 ${day}/小時（越秀官網）"
+    return {"t": txt, "h": day, "hh": night, "nh": nh, "ne": ne, "w": 0,
+            "d12": 0, "d24": 0, "s": "越秀", "u": time.strftime("%Y-%m-%d")}, name
+
+
 def main():
     raw = get(HKEM, "https://www.hkemobility.gov.hk/tc/")
     if not raw:
@@ -224,7 +298,39 @@ def main():
                 break
     print("airport mapped:", apt_hit)
 
-    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+apt",
+    # 越秀亞通（官網逐場價），按名配對：官網名 vs 出行易場名
+    yx_map = {}
+    for k, v in sites.items():
+        if v["n"]:
+            yx_map.setdefault(norm(v["n"]), []).append(k)
+    # 出行易用較長名／分期名，官網用簡名
+    ALIAS = {
+        "南山邨": ["南山邨多層停車場"],
+        "富蝶邨": ["富蝶邨一期停車場", "富蝶邨二期停車場"],
+        "碩門邨": ["碩門邨一期停車場", "碩門邨二期停車場"],
+        "白田邨7及8期": ["白田邨7&8期停車場"],
+        "白田邨": ["白田邨（瑞田樓）停車場"],
+        "興華(二)邨": ["興華二邨停車場"],
+        "蘇屋邨(一期)": ["蘇屋邨停車場一期"],
+    }
+    yx_hit = 0
+    for aid in yuexiu_list():
+        got, name = yuexiu_fee(aid)
+        time.sleep(0.35)
+        if not got or not name:
+            continue
+        keys = yx_map.get(norm(name))
+        if not keys:
+            keys = [yx_map.get(norm(a), []) for a in ALIAS.get(name, [])]
+            keys = [k for sub in keys for k in sub]
+        for k in keys:
+            if sites[k]["fee"]:      # 出行易已有價就唔蓋，只補冇價嘅場
+                continue
+            fees[k] = got
+            yx_hit += 1
+    print("yuexiu mapped:", yx_hit)
+
+    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+yuexiu",
            "n": len(fees), "fees": fees}
     with open("data/park_fees.json", "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))

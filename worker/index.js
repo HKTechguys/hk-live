@@ -106,8 +106,9 @@ function feeText(s) {
     .replace(/&[a-z#0-9]+;/gi, (m) => ENT[m.toLowerCase()] || " ")
     .replace(/\s+/g, " ").trim().slice(0, 240);
 }
-function feeHourly(s) {
-  if (!s) return 0;
+function feeRate(s) {
+  const o = { h: 0, w: 0, nh: 0, ne: 0, hh: 0 };
+  if (!s) return o;
   /* 只在「時租」段落內找價，避免抓到日泊／夜泊／24 小時最高收費 */
   let seg = s;
   const i = s.search(/時租|hourly/i);
@@ -117,19 +118,33 @@ function feeHourly(s) {
     seg = mEnd ? tail.slice(0, mEnd.index) : tail;
   }
   const ok = (v) => (v > 0 && v < 500 ? v : 0);
+  // 先睇有冇時段：(07:00-23:00) $21／(23:00-07:00) $17
+  const slots = [];
+  const re = /([01]?\d|2[0-3]):([0-5]\d)\s*[-–~至]\s*([01]?\d|2[0-3]):([0-5]\d)[^$0-9]{0,24}(?:HK)?\$\s*(\d+(?:\.\d+)?)/g;
+  let ms;
+  while ((ms = re.exec(seg))) slots.push({ a: +ms[1], b: +ms[3], v: ok(+ms[5]) });
+  for (const sl of slots) {
+    if (sl.a >= 20 || sl.b <= 10) { // 夜間時段（跨午夜或凌晨結束）
+      if (!o.hh) { o.hh = sl.v; o.nh = sl.a; o.ne = sl.b; }
+    } else if (!o.h) o.h = sl.v;
+  }
+  // 週末／假期價（星期六日、六日及公眾假期）
+  const we = s.match(/(?:星期六|六日|禮拜六)[\s\S]{0,40}?\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*)?(?:每)?\s*小時/);
+  if (we) o.w = ok(+we[1]);
+  if (o.h) return o;
   let m;
   // 首一小時 $35
   m = seg.match(/首[^0-9$]{0,3}小時\s*[：:]?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/);
-  if (m) return ok(+m[1]);
+  if (m) { o.h = ok(+m[1]); return o; }
   // $21/每小時、$4/半小時
   m = seg.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/|／)\s*(?:每)?\s*(半小時|小時|鐘|hr)/i);
-  if (m) return ok(+m[1] * (/半小時|鐘/.test(m[2]) ? 2 : 1));
+  if (m) { o.h = ok(+m[1] * (/半小時|鐘/.test(m[2]) ? 2 : 1)); return o; }
   // 每小時 $21、每小時收費 HK$18
   m = seg.match(/(?:每小時|每\s*小時)\s*(?:收費)?\s*(?:HK)?\$\s*(\d+(?:\.\d+)?)/i);
-  if (m) return ok(+m[1]);
+  if (m) { o.h = ok(+m[1]); return o; }
   // 有時租段落但冇單位：用段落內第一個數
-  if (i >= 0) { m = seg.match(/\$\s*(\d+(?:\.\d+)?)/); if (m) return ok(+m[1]); }
-  return 0;
+  if (i >= 0) { m = seg.match(/\$\s*(\d+(?:\.\d+)?)/); if (m) o.h = ok(+m[1]); }
+  return o;
 }
 async function hkemParks(force) {
   if (!force && PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
@@ -150,6 +165,7 @@ async function hkemParks(force) {
     const c = (f.geometry && f.geometry.coordinates) || [];
     const ft0 = feeText(p.OTHER_INFO || p.REMARK || "");
     const ft = /\$|\uFF04/.test(ft0) ? ft0 : ""; // 只當有價錢嘅文字係收費，避免 EV 充電等無關備註
+    const rate = feeRate(ft);
     best.set(p.PARK_ID, [
       p.EPARK_ID || p.PARK_ID,                                  // 0 id
       p.NAME || "",                                             // 1 名
@@ -162,7 +178,11 @@ async function hkemParks(force) {
       p.LAST_UPDATE || "",                                      // 8 更新時間
       p.VEHICLE_TYPE || "",                                     // 9 種類
       ft,                                                       // 10 收費原文
-      feeHourly(ft),                                            // 11 參考時租（0＝未知）
+      rate.h,                                                   // 11 參考時租（0＝未知）
+      rate.w,                                                   // 12 星期六日時租（0＝同平日）
+      rate.nh,                                                  // 13 夜間時段開始（0＝無）
+      rate.ne,                                                  // 14 夜間時段結束
+      rate.hh,                                                  // 15 夜間時租
     ]);
   }
   PARKC = { at: Date.now(), rows: [...best.values()] };
