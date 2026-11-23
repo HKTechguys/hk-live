@@ -67,6 +67,25 @@ const HKEM = "https://www.hkemobility.gov.hk/api/drss/layer/map/"
   + "?typeName=DRSS%3AVW_CAR_PARK_TC&service=WFS&version=1.0.0&request=GetFeature"
   + "&outputFormat=application%2Fjson&srsName=EPSG%3A4326";
 let PARKC = { at: 0, rows: null };
+/* 收費文字藏在 OTHER_INFO／REMARK（PARK_FEE_INFO 全空） */
+const ENT = { "&amp": "&", "&lt": "<", "&gt": ">", "&quot": '"', "&#39": "'", "&nbsp": " " };
+function feeText(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/<br\s*\/?>/gi, " / ").replace(/<[^>]+>/g, " ")
+    .replace(/&[a-z#0-9]+;/gi, (m) => ENT[m.toLowerCase()] || " ")
+    .replace(/\s+/g, " ").trim().slice(0, 240);
+}
+function feeHourly(s) {
+  if (!s) return 0;
+  let m = s.match(/(?:每小時|每\s*小時|hourly)[^0-9$]{0,8}(?:HK)?\$?\s*(\d+(?:\.\d+)?)/i)
+    || s.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:半小時|半個鐘))/)
+    || s.match(/\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:小時|hr))?/);
+  if (!m) return 0;
+  let v = +m[1];
+  if (/半小時|半個鐘/.test(m[0]) && !/每小時/.test(m[0])) v *= 2;
+  return v > 0 && v < 500 ? v : 0;
+}
 async function hkemParks(force) {
   if (!force && PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
   const r = await fetch(HKEM, { headers: {
@@ -84,6 +103,8 @@ async function hkemParks(force) {
     const isP = p.VEHICLE_TYPE === "P";
     if (cur && !(isP && cur[9] !== "P")) continue; // 每個場留一條，私家車優先
     const c = (f.geometry && f.geometry.coordinates) || [];
+    const ft0 = feeText(p.OTHER_INFO || p.REMARK || "");
+    const ft = /\$|\uFF04/.test(ft0) ? ft0 : ""; // 只當有價錢嘅文字係收費，避免 EV 充電等無關備註
     best.set(p.PARK_ID, [
       p.EPARK_ID || p.PARK_ID,                                  // 0 id
       p.NAME || "",                                             // 1 名
@@ -95,6 +116,8 @@ async function hkemParks(force) {
       typeof p.HEIGHT === "number" ? p.HEIGHT : 0,               // 7 高限
       p.LAST_UPDATE || "",                                      // 8 更新時間
       p.VEHICLE_TYPE || "",                                     // 9 種類
+      ft,                                                       // 10 收費原文
+      feeHourly(ft),                                            // 11 參考時租（0＝未知）
     ]);
   }
   PARKC = { at: Date.now(), rows: [...best.values()] };

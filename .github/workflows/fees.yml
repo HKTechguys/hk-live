@@ -1,0 +1,23 @@
+name: refresh fees
+on:
+  schedule:
+    - cron: "17 3 * * 1"    # 每週一 11:17 HKT
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fees:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python tools/refresh_fees.py
+        working-directory: .
+      - run: |
+          git config user.name  "hk-live-bot"
+          git config user.email "bot@hk-live.local"
+          git add data/park_fees.json
+          git diff --cached --quiet || git commit -m "data: park fees $(date -u +%F)"
+          git push

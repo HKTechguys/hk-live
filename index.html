@@ -428,6 +428,8 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .pp .row{display:flex;justify-content:space-between;gap:14px;padding:3px 0;border-top:1px dashed #1b2634}
 .pp .row span{color:#8fa3ad}
 .pp .big{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp .fee{color:#c9d6de;font-size:10.5px;line-height:1.55;margin-top:4px;max-height:96px;overflow:auto;word-break:break-word}
+.pp .fee em{font-style:normal;color:#8fa3ad}
 .pp .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10.5px;margin-top:8px}
 .pp-act{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
 .pp-act button,.pp-act a{font:inherit;font-size:11px;text-decoration:none;
@@ -1311,6 +1313,7 @@ setInterval(loadRadar, 720000);
     return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
       return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
         properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"", oldp:p.oldp?1:0, snap:p.snap?1:0,
+          f:p.f||"", fh:p.fh||0, fs:p.fs||"",
           cls: p.v < 0 ? "x" : p.v >= 20 ? "a" : p.v >= 5 ? "b" : p.v >= 1 ? "c" : "d"}};
     })};
   }
@@ -1640,6 +1643,8 @@ setInterval(loadRadar, 720000);
         + (v < 0 ? "—" : v)+'</span></div>'
         + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
         + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
+        + (Number(p.fh) > 0 ? '<div class="row"><span>時租參考</span><span class="big" style="color:#f6c85f">$'+p.fh+'/小時</span></div>' : "")
+        + (p.f ? '<div class="fee">'+esc(p.f)+(p.fs ? ' <em>· '+esc(p.fs)+'</em>' : '')+'</div>' : "")
         + '<div class="row"><span>更新</span><span>'+(p.u
             ? esc(String(p.u).slice(0,16)) + (p.snap ? ' <em style="font-style:normal;color:#8fa3ad">· 運輸署快照</em>'
               : p.oldp ? ' <em style="font-style:normal;color:#8fa3ad">· 較舊</em>' : "")
@@ -2456,7 +2461,7 @@ setInterval(loadRadar, 720000);
   }
 
   /* ---------- 全港停車場（香港出行易圖層經 Worker 代理，含非運輸署場） ---------- */
-  var PKL = {busy:false, at:0, n:0};
+  var PKL = {busy:false, at:0, n:0, fee:null};
   /* 出行易回傳 UTC（...T08:26:30Z），顯示要轉香港時間 */
   function hkT(s){
     var t = Date.parse(s || "");
@@ -2471,12 +2476,29 @@ setInterval(loadRadar, 720000);
       o.push({id:String(r[0]), n:r[1] || "停車場", a:r[2] || "", d:r[6] || "",
         la:r[3], lo:r[4], v:(typeof r[5] === "number" ? r[5] : -1),
         vd:0, h:r[7] || 0, u:hkT(r[8]),
+        f:r[10] || "", fh:r[11] || 0,
         oldp: !!r[8] && Date.now() - Date.parse(r[8]) > 3600000});
     }
     return o;
   }
-  function pkRetry(){
-    if (PKL.t) return;
+  /* 領展等營運商收費（tools/refresh_fees.py 產生），用來補出行易冇價嘅場 */
+  function applyFees(){
+    var fee = PKL.fee; if (!fee) return;
+    var arr = ST.parks || [], i, p, e, n = 0;
+    for (i = 0; i < arr.length; i++){
+      p = arr[i]; e = fee[p.id];
+      if (!e) continue;
+      if (!p.f && e.t){ p.f = e.t; p.fs = e.s || ""; n++; }
+      if (!p.fh && e.h){ p.fh = e.h; n++; }
+    }
+    if (n && ST.map){ var s = ST.map.getSource("parks"); if (s) s.setData(parksFC()); }
+  }
+  function loadFees(){
+    fetch("data/park_fees.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+      PKL.fee = (j && j.fees) || {}; applyFees();
+    }).catch(function(){});
+  }
+  function pkRetry(){    if (PKL.t) return;
     PKL.t = setTimeout(function(){ PKL.t = null; pkLive(); }, 20000);
   }
   function pkLive(force){
@@ -2499,6 +2521,7 @@ setInterval(loadRadar, 720000);
       var src = ST.map && ST.map.getSource("parks");
       if (src) src.setData(parksFC());
       CF.pc = {};
+      applyFees();
       if (document.getElementById("p-cafe") && document.getElementById("p-cafe").classList.contains("on")) renderCafes();
       var total = 0, open = 0, i, p;
       for (i = 0; i < ST.parks.length; i++){ p = ST.parks[i]; if (p.v > 0){ total += p.v; open++; } }
@@ -2592,6 +2615,7 @@ setInterval(loadRadar, 720000);
       document.getElementById("s-time").textContent = pk.last_update || pk.generated;
       hudMeter();
       pkLive();
+      loadFees();
       if (!PKL.timer) PKL.timer = setInterval(function(){
         if (document.visibilityState === "visible" && TG.parks) pkLive();
       }, 120000);
@@ -2654,7 +2678,7 @@ setInterval(loadRadar, 720000);
     hashJump();
   });
 
-  window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck, LIVE: LIVE, livePull: livePull, liveApply: liveApply };
+  window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck, LIVE: LIVE, livePull: livePull, liveApply: liveApply, parkPopup: parkPopup };
 
   /* 加到主畫面：自己出提示（Chrome 唔一定自動彈），撳 ✕ 就唔再出 */
   var IE = null, INSTALL_OFF = "hk_install_off";
