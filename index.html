@@ -1286,7 +1286,7 @@ setInterval(loadRadar, 720000);
   function parksFC(){
     return {type:"FeatureCollection", features:(ST.parks||[]).map(function(p){
       return {type:"Feature", geometry:{type:"Point", coordinates:[p.lo,p.la]},
-        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h,
+        properties:{id:p.id, n:p.n, e:p.e, a:p.a, d:p.d, v:p.v, vd:p.vd, h:p.h, u:p.u||"",
           cls: p.v < 0 ? "x" : p.v >= 20 ? "a" : p.v >= 5 ? "b" : p.v >= 1 ? "c" : "d"}};
     })};
   }
@@ -1615,7 +1615,7 @@ setInterval(loadRadar, 720000);
         + (v < 0 ? "—" : v)+'</span></div>'
         + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
         + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
-        + '<div class="row"><span>更新</span><span>'+esc(ST.pm.last_update||"")+'</span></div>'
+        + '<div class="row"><span>更新</span><span>'+esc(p.u ? String(p.u).replace("T"," ").slice(0,16) : (ST.pm.last_update||""))+'</span></div>'
         + '<span class="tag" style="background:rgba(84,216,196,.12);color:'+valColor(v)+'">'+tag+'</span>'
         + actBtns(p.a || p.d, lnglat[1], lnglat[0]) + '</div>')
       .addTo(map);
@@ -2336,6 +2336,39 @@ setInterval(loadRadar, 720000);
     }).catch(function(e){ toast("設定失敗：" + e); });
   }
 
+  /* ---------- 全港停車場（香港出行易圖層經 Worker 代理，含非運輸署場） ---------- */
+  var PKL = {busy:false, at:0, n:0};
+  function pkRows2Parks(rows){
+    var o = [], i, r;
+    for (i = 0; i < rows.length; i++){
+      r = rows[i];
+      if (!r || !r[3] || !r[4]) continue;
+      o.push({id:String(r[0]), n:r[1] || "停車場", a:r[2] || "", d:r[6] || "",
+        la:r[3], lo:r[4], v:(typeof r[5] === "number" ? r[5] : -1),
+        vd:0, h:r[7] || 0, u:r[8] || ""});
+    }
+    return o;
+  }
+  function pkLive(){
+    if (PKL.busy || !PUSH.api) return;
+    PKL.busy = true;
+    fetch(PUSH.api + "/parks").then(function(r){ return r.json(); }).then(function(d){
+      PKL.busy = false;
+      if (!d || !d.rows || !d.rows.length) return;
+      ST.parks = pkRows2Parks(d.rows); PKL.at = d.at || Date.now(); PKL.n = ST.parks.length;
+      var src = ST.map && ST.map.getSource("parks");
+      if (src) src.setData(parksFC());
+      var total = 0, open = 0, i, p;
+      for (i = 0; i < ST.parks.length; i++){ p = ST.parks[i]; if (p.v > 0){ total += p.v; open++; } }
+      var sv = document.getElementById("s-vac"), so = document.getElementById("s-open"),
+          stt = document.getElementById("s-time"), tb = document.getElementById("tg-parks");
+      if (sv) sv.textContent = num(total);
+      if (so) so.textContent = open + " / " + ST.parks.length;
+      if (stt) stt.textContent = new Date(PKL.at).toLocaleTimeString("zh-HK", {hour12:false});
+      if (tb) tb.textContent = "停車場 " + ST.parks.length.toLocaleString();
+    }).catch(function(){ PKL.busy = false; });
+  }
+
   /* ---------- data ---------- */
   function loadData(){
     var bust = "?t=" + Date.now();
@@ -2370,6 +2403,10 @@ setInterval(loadRadar, 720000);
       document.getElementById("s-meter").textContent = num(mt.vacant || 0);
       document.getElementById("s-time").textContent = pk.last_update || pk.generated;
       hudMeter();
+      pkLive();
+      if (!PKL.timer) PKL.timer = setInterval(function(){
+        if (document.visibilityState === "visible" && TG.parks) pkLive();
+      }, 120000);
 
       var districts = {};
       ST.cafes.forEach(function(c){ if (c.d) districts[c.d] = (districts[c.d]||0)+1; });

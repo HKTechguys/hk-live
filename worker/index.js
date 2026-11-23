@@ -29,6 +29,8 @@ async function handle(req, env) {
       const l = await env.PUSH_KV.list({ prefix: "sub:" });
       return out({ ok: true, subs: l.keys.length });
     }
+    // 香港出行易停車場全量（1,654 個場，含非運輸署場；有實時空位就用 VACANCY）
+    if (url.pathname === "/parks") return out(await hkemParks());
     const b = req.method === "POST" ? await req.json().catch(() => null) : null;
     if (url.pathname === "/subscribe") {
       if (!b || !b.endpoint || !b.sub) return out({ error: "missing" }, 400);
@@ -58,6 +60,45 @@ async function handle(req, env) {
     return out({ error: String(e) }, 500);
   }
   return out({ error: "not found" }, 404);
+}
+
+/* ---------- 停車場（香港出行易 DRSS 圖層，需 Referer 才過 403） ---------- */
+const HKEM = "https://www.hkemobility.gov.hk/api/drss/layer/map/"
+  + "?typeName=DRSS%3AVW_CAR_PARK_TC&service=WFS&version=1.0.0&request=GetFeature"
+  + "&outputFormat=application%2Fjson&srsName=EPSG%3A4326";
+let PARKC = { at: 0, rows: null };
+async function hkemParks() {
+  if (PARKC.rows && Date.now() - PARKC.at < 120000) return PARKC;
+  const r = await fetch(HKEM, { headers: {
+    Referer: "https://www.hkemobility.gov.hk/tc/",
+    Origin: "https://www.hkemobility.gov.hk",
+    "User-Agent": "Mozilla/5.0",
+  }});
+  if (!r.ok) throw new Error("hkem " + r.status);
+  const j = await r.json();
+  const best = new Map();
+  for (const f of j.features || []) {
+    const p = f.properties || {};
+    if (!p.PARK_ID) continue;
+    const cur = best.get(p.PARK_ID);
+    const isP = p.VEHICLE_TYPE === "P";
+    if (cur && !(isP && cur[9] !== "P")) continue; // 每個場留一條，私家車優先
+    const c = (f.geometry && f.geometry.coordinates) || [];
+    best.set(p.PARK_ID, [
+      p.EPARK_ID || p.PARK_ID,                                  // 0 id
+      p.NAME || "",                                             // 1 名
+      p.DISPLAY_ADDRESS || "",                                  // 2 地址
+      +(+c[1] || 0).toFixed(5),                                 // 3 lat
+      +(+c[0] || 0).toFixed(5),                                 // 4 lng
+      typeof p.VACANCY === "number" ? p.VACANCY : -1,            // 5 空位（-1 無數據）
+      p.DISTRICT || "",                                         // 6 區
+      typeof p.HEIGHT === "number" ? p.HEIGHT : 0,               // 7 高限
+      p.LAST_UPDATE || "",                                      // 8 更新時間
+      p.VEHICLE_TYPE || "",                                     // 9 種類
+    ]);
+  }
+  PARKC = { at: Date.now(), rows: [...best.values()] };
+  return PARKC;
 }
 
 /* ---------- cron ---------- */
