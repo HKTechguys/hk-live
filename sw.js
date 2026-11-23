@@ -19,6 +19,7 @@ self.addEventListener("push", function(e){
         if (r.ok) a = await r.json();
       }
     } catch(err){}
+    var url = "./index.html#park" + (a.ids && a.ids[0] ? "?mt=" + encodeURIComponent(a.ids[0]) : "");
     var cls = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (var i = 0; i < cls.length; i++) cls[i].postMessage({ type: "hk-push", title: a.title || "" });
     var opt = {
@@ -26,7 +27,7 @@ self.addEventListener("push", function(e){
       tag: "hk-live", renotify: true, requireInteraction: true,
       vibrate: [140, 70, 140, 70, 220],
       icon: "icon-192.png", badge: "favicon-32.png",
-      data: { url: "./index.html#meter" }
+      data: { url: url }
     };
     try {
       await self.registration.showNotification(a.title || "HK Live · 有位", opt);

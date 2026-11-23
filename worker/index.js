@@ -105,7 +105,9 @@ function build(hit, map) {
     const m = map[f.id];
     return m ? f.id + "（" + m[0] + "，" + m[1] + "）" : f.id;
   }).join("、");
-  return { title, body, at: Date.now() };
+  const ids = hit.map((f) => f.id);
+  const first = map[ids[0]] || [];
+  return { title, body, ids, la: first[3] || 0, lo: first[4] || 0, at: Date.now() };
 }
 
 async function recentVacant(map) {
@@ -137,14 +139,14 @@ function ts2ms(s) {
   return Date.UTC(+m[3], +m[1] - 1, +m[2], h - 8, +m[5], +m[6]);
 }
 
-/* id → [街, 區, 車種]，來源 data/meters.json，KV 快取 7 日 */
+/* id → [街, 區, 車種, lat, lng]，來源 data/meters.json，KV 快取 7 日 */
 async function mtrMap(kv) {
-  const c = await kv.get("mtrmap", "json");
+  const c = await kv.get("mtrmap2", "json");
   if (c && c.at && Date.now() - c.at < 7 * 864e5) return c.rows;
   const j = await (await fetch(MTRS, { cf: { cacheTtl: 3600 } })).json();
   const rows = {};
-  for (const s of j.spaces || []) rows[String(s[0])] = [s[4] || "", s[5] || "", s[6] || ""];
-  await kv.put("mtrmap", JSON.stringify({ at: Date.now(), rows }));
+  for (const s of j.spaces || []) rows[String(s[0])] = [s[4] || "", s[5] || "", s[6] || "", s[1], s[2]];
+  await kv.put("mtrmap2", JSON.stringify({ at: Date.now(), rows }));
   return rows;
 }
 

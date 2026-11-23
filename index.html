@@ -1496,7 +1496,7 @@ setInterval(loadRadar, 720000);
     wtPersist();
     if (typeof renderMeters === "function") renderMeters();
   }
-  function hkAlert(title, body, q){
+  function hkAlert(title, body, q, ids){
     var old = document.getElementById("hk-alert");
     if (old) old.remove();
     var el = document.createElement("div");
@@ -1506,6 +1506,7 @@ setInterval(loadRadar, 720000);
     document.body.appendChild(el);
     el.querySelector(".go").addEventListener("click", function(){
       el.remove();
+      if (ids && ids.length) { jumpMeter(ids[0]); return; }
       if (q) { MI.q = q; MI.shown = MI.size; MI.dist = ""; var ds = document.getElementById("mt-dist"); if (ds) ds.value = ""; }
       go("meter");
     });
@@ -1513,17 +1514,17 @@ setInterval(loadRadar, 720000);
     setTimeout(function(){ if (el.parentNode) el.remove(); }, 16000);
   }
   function wtNotice(h){
-    var title, body, tag, q;
+    var title, body, tag, q, ids = h.ids || (h.w && h.w.id ? [String(h.w.id)] : []);
     if (h.street) { title = "有位！" + h.street; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-s-" + h.street; q = h.street; }
     else if (h.district) { title = "有位！" + h.district; body = h.cnt + " 個位剛空出：" + h.ids.join("、"); tag = "hkwt-d-" + h.district; q = h.district; }
     else { title = "有位！" + (h.w.n || "路邊泊車位"); body = "位號 " + h.w.id + " 由佔用中變空置"; tag = "hkwt-" + h.w.id; q = h.w.s || h.w.n || ""; }
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         var n = new Notification(title, {body: body, tag: tag, requireInteraction: true});
-        n.onclick = function(){ try { window.focus(); } catch(e){} };
+        n.onclick = function(){ try { window.focus(); } catch(e){} if (ids.length) jumpMeter(ids[0]); };
       } catch(e){}
     }
-    hkAlert(title, body, q);
+    hkAlert(title, body, q, ids);
     if (navigator.vibrate) { try { navigator.vibrate([140, 70, 140, 70, 220]); } catch(e){} }
   }
   function wtSeedScope(w){
@@ -1619,6 +1620,32 @@ setInterval(loadRadar, 720000);
         + actBtns(p.a || p.d, lnglat[1], lnglat[0]) + '</div>')
       .addTo(map);
     map.easeTo({center:lnglat, zoom:Math.max(map.getZoom(),14.2), duration:450});
+  }
+
+  function jumpMeter(id, tries){
+    tries = tries || 0;
+    var arr = ST.meters || [], f = null, i;
+    for (i = 0; i < arr.length; i++) if (String(arr[i][0]) === String(id)) { f = arr[i]; break; }
+    if ((!f || !ST.map) && tries < 20) { setTimeout(function(){ jumpMeter(id, tries + 1); }, 300); return; }
+    if (!f) { toast("搵唔到咪錶位 " + id); return; }
+    showTab("tab-map");
+    closeSheet("p-cafe"); closeSheet("p-trail");
+    TG.meters = true; setBtn("tg-meters", true); applyToggles();
+    ST.map.flyTo({ center: [f[2], f[1]], zoom: 17, duration: 600 });
+    setTimeout(function(){
+      meterPopup({ features: [{ properties: { id: String(f[0]), s: f[4], d: f[5], st: f[3], vt: f[6] },
+        geometry: { coordinates: [f[2], f[1]] } }] });
+    }, 800);
+  }
+  function hashJump(){
+    var h = (location.hash || "").replace("#", ""), qi = h.indexOf("?");
+    if (qi < 0) return;
+    var kv = {};
+    h.slice(qi + 1).split("&").forEach(function(p){
+      var a = p.split("=");
+      if (a[0]) kv[a[0]] = decodeURIComponent(a[1] || "");
+    });
+    if (kv.mt) jumpMeter(kv.mt);
   }
 
   function meterPopup(e){
@@ -2271,7 +2298,11 @@ setInterval(loadRadar, 720000);
   }
   function pushInit(){
     pushLabel();
-    if (!PUSH.api || !("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.addEventListener("message", function(e){
+      if (e.data && e.data.type === "hk-push" && LIVE.on) livePull();
+    });
+    if (!PUSH.api) return;
     navigator.serviceWorker.getRegistration().then(function(r){
       if (!r) return;
       r.pushManager.getSubscription().then(function(sub){
@@ -2371,12 +2402,13 @@ setInterval(loadRadar, 720000);
 
   /* ---------- routing ---------- */
   function go(h){
-    if (h === "now") { showTab("tab-now"); return; }
+    var base = h.split("?")[0];
+    if (base === "now") { showTab("tab-now"); return; }
     showTab("tab-map");
-    if (h === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); closeSheet("p-trail"); closeSheet("p-meter"); openSheet("p-cafe"); }
-    else if (h === "trail" || h === "trails") { TG.trails = true; setBtn("tg-trails", true); closeSheet("p-cafe"); closeSheet("p-meter"); openSheet("p-trail"); }
-    else if (h === "meter") { TG.meters = true; setBtn("tg-meters", true); closeSheet("p-cafe"); closeSheet("p-trail"); openSheet("p-meter"); if (typeof renderMeters === "function") renderMeters(); }
-    else if (h === "park") { TG.parks = true; setBtn("tg-parks", true); closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
+    if (base === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); closeSheet("p-trail"); closeSheet("p-meter"); openSheet("p-cafe"); }
+    else if (base === "trail" || base === "trails") { TG.trails = true; setBtn("tg-trails", true); closeSheet("p-cafe"); closeSheet("p-meter"); openSheet("p-trail"); }
+    else if (base === "meter") { TG.meters = true; setBtn("tg-meters", true); closeSheet("p-cafe"); closeSheet("p-trail"); openSheet("p-meter"); if (typeof renderMeters === "function") renderMeters(); }
+    else if (base === "park") { TG.parks = true; setBtn("tg-parks", true); closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
     else { closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
     applyToggles();
     try { history.replaceState(null, "", "#" + h); } catch(e){}
@@ -2384,15 +2416,17 @@ setInterval(loadRadar, 720000);
 
   document.addEventListener("DOMContentLoaded", function(){
     wireSearch(); wireCafeUI(); wireTrailUI(); wireMeterUI(); wtLoad();
-    var h = (location.hash || "").replace("#", "");
-    if (["now","map","park","cafe","trail","meter"].indexOf(h) >= 0) go(h);
+    var h = (location.hash || "").replace("#", ""), base = h.split("?")[0];
+    if (["now","map","park","cafe","trail","meter"].indexOf(base) >= 0) go(h);
+    if (h.indexOf("?") >= 0) hashJump();
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
   });
 
   window.addEventListener("hashchange", function(){
-    var h = (location.hash || "").replace("#", "");
-    if (["now","map","park","cafe","trail","meter"].indexOf(h) >= 0) go(h);
+    var h = (location.hash || "").replace("#", ""), base = h.split("?")[0];
+    if (["now","map","park","cafe","trail","meter"].indexOf(base) >= 0) go(h);
+    hashJump();
   });
 
   window.__hk = { ST: ST, TG: TG, WT: WT, wtCheck: wtCheck, LIVE: LIVE, livePull: livePull, liveApply: liveApply };
