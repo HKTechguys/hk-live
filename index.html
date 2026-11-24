@@ -524,10 +524,10 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
   .pk-hud .pk-chip:nth-child(4){display:block}
   .pk-hud .pk-chip:nth-child(4) b{font-size:10.5px!important}
   .pk-tools{left:8px;right:8px;max-width:none;gap:5px;padding:6px;bottom:calc(8px + env(safe-area-inset-bottom));
-    display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
   .pk-tools .pk-watch{grid-column:1/-1}
-  .pk-tools button{font-size:10.5px;padding:4px 6px;gap:4px;border-radius:7px;justify-content:center;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pk-tools button{font-size:10px;padding:4px 5px;gap:4px;border-radius:7px;justify-content:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
   .pk-tools button::before{width:6px;height:6px}
   .sheet{height:82vh}
   /* iOS 聚焦 <16px 輸入框會自動放大整頁 */
@@ -977,11 +977,11 @@ setInterval(loadRadar, 720000);
     <button id="tg-parks" aria-pressed="true">停車場</button>
     <button id="tg-meters" aria-pressed="true">感應咪錶</button>
     <button id="tg-cafes" aria-pressed="false">Cafe</button>
-    <button id="tg-trails" aria-pressed="false">遠足徑＋標距柱</button>
+    <button id="tg-trails" aria-pressed="false">遠足徑</button>
     <button id="tg-free" aria-pressed="false">只看有空位</button>
-    <button id="open-trail" class="pk-list">山徑 167 段</button>
-    <button id="open-meter" class="pk-list">咪錶 20,735 位</button>
-    <button id="open-cafe" class="pk-list">Cafe 446 間</button>
+    <button id="open-trail" class="pk-list">山徑 167</button>
+    <button id="open-meter" class="pk-list">咪錶 17,635</button>
+    <button id="open-cafe" class="pk-list">Cafe 446</button>
     <button id="open-info" class="pk-list pk-info">ⓘ 功能說明</button>
   </div>
 
@@ -2299,7 +2299,7 @@ setInterval(loadRadar, 720000);
     var lb = document.getElementById("s-meter-lb");
     if (lb) lb.textContent = MI.vt === "A" ? "私家車位剩餘" : "路邊感應位剩餘";
     var ob = document.getElementById("open-meter");
-    if (ob && n) ob.textContent = "咪錶 " + num(n) + " 位";
+    if (ob && n) ob.textContent = "咪錶 " + num(n);
     return v;
   }
   function renderVtChips(){
@@ -2862,7 +2862,7 @@ setInterval(loadRadar, 720000);
       ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
       MI.cache = null;
       var mb = document.getElementById("open-meter");
-      if (mb && ST.meters.length) mb.textContent = "咪錶 " + ST.meters.length.toLocaleString() + " 位";
+      if (mb && ST.meters.length) mb.textContent = "咪錶 " + ST.meters.length.toLocaleString();
       var mdist = document.getElementById("mt-dist");
       if (mdist && mdist.options.length < 2) {
         var ds = {}, i2;
@@ -2898,7 +2898,7 @@ setInterval(loadRadar, 720000);
       });
       document.getElementById("cf-sub").textContent =
         ST.cafes.length + " 間咖啡店 · 事實欄位＋原文節錄 · 不含照片與標誌";
-      document.getElementById("open-cafe").textContent = "Cafe " + ST.cafes.length + " 間";
+      document.getElementById("open-cafe").textContent = "Cafe " + ST.cafes.length;
 
       var km = 0;
       ST.trails.forEach(function(t){ km += t.len; });
@@ -2906,7 +2906,7 @@ setInterval(loadRadar, 720000);
       document.getElementById("tr-sub").textContent =
         "漁護署官方圖層 · " + ST.trails.length + " 段 · " + num(ST.posts.length)
         + " 支標距柱 · " + Math.round(km) + " km";
-      document.getElementById("open-trail").textContent = "山徑 " + ST.trails.length + " 段";
+      document.getElementById("open-trail").textContent = "山徑 " + ST.trails.length;
 
       if (ST.map) syncLayers(ST.map);
       renderLevels(); renderTrails(); renderCafes();
@@ -3010,6 +3010,7 @@ setInterval(loadRadar, 720000);
     pushLabel();
   }
 })();
+
 
 
 </script>
