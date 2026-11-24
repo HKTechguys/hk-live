@@ -1181,6 +1181,7 @@ setInterval(loadRadar, 720000);
     <ul class="wn-list">
       <li>圖層面板新增<b>「設施」</b>一行：撳開見到 <b>廁所</b>、<b>地鐵出口</b>（有出口編號，例如「出口 B」）、<b>油站</b>、<b>醫院</b> 四個獨立開關，可同時開。</li>
       <li>地圖上以徽章顯示：<b>WC</b>（藍圓）、<b>H</b>（紫圓）、地鐵出口直接寫<b>出口編號</b>（紅方牌，例如 <b>A1</b>、<b>D2</b>；無編號一律「M」）、油站用<b>品牌色長牌</b>（Shell 黃底紅字／Esso 白底藍框／Caltex 白底紅字／Sinopec 紅底白字／中石油 紅底黃字／其他「油」）。</li>
+      <li>地鐵出口 popup 會顯示<b>所屬站名</b>（例如「旺角站 · 出口 B1」、「旺角東站 · 出口 C」、「太子站 · 出口 A」），另附層數／輪椅通道。</li>
       <li>廁所 zoom ≥ 14、出口／油站 ≥ 13、醫院 ≥ 11 才出現，避免全港一次畫幾千點。</li>
       <li>撳任何徽章見到名稱、類別（同油站品牌／醫院營運者／出口編號）以及一撳「路線」。</li>
       <li><b>資料來源</b>：OpenStreetMap（ODbL），每週自動更新一次；廁所與油站屬社群記錄，可能有未收錄或已停用情況，只作位置參考。</li>
@@ -1222,7 +1223,7 @@ setInterval(loadRadar, 720000);
       <li>每項外來資料加返來源 credit（見上面 ⑩）。</li>
       <li><b>Cafe 名單改為每日 09:00 自動更新</b>（該站官方 API；新店自動加入、結業自動移除）。</li>
       <li><b>新增每日 10:30 健康檢查</b>：Worker 即時數據、運輸署咪錶來源、線上網站、各份 data 新鮮度；壞咗 GitHub 會發失敗通知。</li>
-      <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新；地鐵出口徽章改寫<b>出口編號</b>（A1／D2…），油站改<b>品牌色徽章</b>（Shell／Esso／Caltex／Sinopec／中石油）。</li>
+      <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新；地鐵出口徽章改寫<b>出口編號</b>（A1／D2…）並在 popup 顯示<b>站名</b>，油站改<b>品牌色徽章</b>（Shell／Esso／Caltex／Sinopec／中石油）。</li>
     </ul>
 
     <div class="wn-day"><span class="d">2026-11-24</span><span class="t">收費解析全面校正 <span class="wn-tag">最新</span></span></div>
@@ -1694,7 +1695,7 @@ setInterval(loadRadar, 720000);
   function facilitiesFC(){
     return {type:"FeatureCollection", features:(ST.fac||[]).map(function(f){
       return {type:"Feature", geometry:{type:"Point", coordinates:[f[3], f[2]]},
-        properties:{ty:f[0], n:f[1], x:f[4]||"", r:f[5]||""}};
+        properties:{ty:f[0], n:f[1], x:f[4]||"", r:f[5]||"", st:f[6]||""}};
     })};
   }
   function trailsFC(){
@@ -2136,12 +2137,18 @@ setInterval(loadRadar, 720000);
                 sinopec:"Sinopec（中石化）", petrochina:"中石油", cnooc:"中海油", other:""};
   function facPopup(e){
     var q = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
-    var title = q.n, sub = FACN[q.ty] || "", extra = q.x || "";
-    if (q.ty === "m" && q.r && (!q.n || q.n === q.r)) title = "出口 " + q.r;
+    var title = q.n, sub = FACN[q.ty] || "", extra = q.x || "", hideCode = false;
+    if (q.ty === "m"){
+      var code = q.r && q.r !== "M" ? q.r : "";
+      if (code) hideCode = true;
+      if (q.st) title = q.st + (code ? " · 出口 " + code : " · 出口");
+      else if (!q.n || q.n === q.r) title = code ? "出口 " + code : "出口";
+    }
     if (q.ty === "f"){
       if (q.r && q.r !== "other"){ title = BRNAME[q.r] || q.n || "油站"; extra = ""; }
       else if (!q.n || q.n === "油站") title = "油站";
     }
+    if (hideCode) extra = (extra || "").replace("出口 " + q.r, "").replace(/^[\s·]+|[\s·]+$/g, "");
     if (extra && extra.toLowerCase() === String(title || "").toLowerCase()) extra = "";
     new maplibregl.Popup({maxWidth:"250px"}).setLngLat(lnglat)
       .setHTML('<div class="pp"><h4>'+esc(title || FACN[q.ty] || "設施")+'</h4>'

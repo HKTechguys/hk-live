@@ -51,8 +51,7 @@ def inside(lon, lat):
     return c
 
 
-def fetch(ty, key, val):
-    q = "[out:json][timeout:120];nwr[%s=%s](%s);out center tags;" % (key, val, BBOX)
+def fetch_q(q, label):
     data = urllib.parse.urlencode({"data": q}).encode()
     last = None
     for attempt in range(6):
@@ -71,7 +70,79 @@ def fetch(ty, key, val):
         except Exception as e:
             last = "%s: %s" % (ep, e)
         time.sleep(15 * (attempt + 1))
-    raise SystemExit("%s 抓唔到：%s" % (ty, last))
+    raise SystemExit("%s 抓唔到：%s" % (label, last))
+
+
+def fetch(ty, key, val):
+    return fetch_q("[out:json][timeout:120];nwr[%s=%s](%s);out center tags;" % (key, val, BBOX), ty)
+
+
+STATIONS_Q = ("[out:json][timeout:180];(node[railway=station](%s);"
+              "way[railway=station](%s);relation[railway=station](%s));out center tags;" % (BBOX, BBOX, BBOX))
+
+
+CJK = re.compile(r"[\u3400-\u9fff]")
+
+
+def station_name(tags):
+    """站名優先中文（traditional 為準），真係冇中文就用英文名再補「站」。"""
+    raw = [tags.get(k) or "" for k in ("name", "name:zh-Hant", "name:zh", "name:en")]
+    nm = ""
+    for r in raw:
+        v = zh_part(r)
+        if v and CJK.search(v):
+            nm = v
+            break
+    if not nm:
+        for r in raw:
+            v = re.sub(r"\s*(Station|站)\s*", "", (r or "").strip())
+            if v:
+                nm = v
+                break
+    if not nm:
+        return ""
+    if not nm.endswith("站"):
+        nm += "站"
+    return nm[:20]
+
+
+def build_stations(js):
+    """地鐵站點清單 [(lon,lat,名)]，用嚟將出口駁返所屬站名。
+    同名／同址重複只留一個，並且優先留中文名（避免英文名版本頂走「迪士尼站」）。"""
+    raw = []
+    for el in js.get("elements", []):
+        tags = el.get("tags") or {}
+        if tags.get("station") not in ("subway", "train", "", None):
+            continue
+        lat = el.get("lat") or (el.get("center") or {}).get("lat")
+        lon = el.get("lon") or (el.get("center") or {}).get("lon")
+        if not lat or not lon or not inside(float(lon), float(lat)):
+            continue
+        nm = station_name(tags)
+        if nm:
+            raw.append((0 if CJK.search(nm) else 1, float(lon), float(lat), nm))
+    raw.sort(key=lambda x: x[0])
+    st = []
+    for _, lon, lat, nm in raw:
+        for slon, slat, snm in st:
+            if snm == nm or (((lon - slon) * 102000) ** 2 + ((lat - slat) * 111000) ** 2) < 3600:
+                break
+        else:
+            st.append((lon, lat, nm))
+    return st
+
+
+def nearest_station(lon, lat, stations, max_m=400):
+    best, bd = "", 1e9
+    for slon, slat, nm in stations:
+        dx = (lon - slon) * 102000.0
+        dy = (lat - slat) * 111000.0
+        d = dx * dx + dy * dy
+        if d < bd:
+            bd, best = d, nm
+    if bd > max_m * max_m:
+        return ""
+    return best
 
 
 def zh_part(s):
@@ -149,6 +220,8 @@ def extra_of(tags, ty):
 def main():
     dry = "--dry-run" in sys.argv
     items, seen, stats = [], set(), {}
+    stations = build_stations(fetch_q(STATIONS_Q, "stations"))
+    print("stations=%d" % len(stations))
     for ty, key, val in RULES:
         js = fetch(ty, key, val)
         keep = 0
@@ -166,8 +239,9 @@ def main():
                 continue
             seen.add(dk)
             keep += 1
+            st = nearest_station(float(lon), float(lat), stations) if ty == "m" and stations else ""
             items.append([ty, nm, round(float(lat), 6), round(float(lon), 6),
-                          extra_of(tags, ty), code_of(tags, ty)])
+                          extra_of(tags, ty), code_of(tags, ty), st])
         stats[ty] = keep
 
     items.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
