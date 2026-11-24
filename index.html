@@ -211,6 +211,17 @@ body.sheet-on .hk-install{display:none}
 .pk-tools button.pk-list{color:var(--ink);border-color:rgba(255,255,255,.22)}
 .pk-tools button.pk-list::before{display:none}
 .pk-tools button.pk-list::after{content:"▸";color:var(--dim);font-size:10px}
+/* 設施：一條全寬組頭 + 一行 4 個子開關 */
+.pk-tools .pk-fac{flex:0 0 100%;grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:10.5px;letter-spacing:.2px;color:var(--ink);background:rgba(13,19,29,.92);
+  border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:5px 8px}
+.pk-tools .pk-fac::before,.pk-tools .pk-fac::after{display:none}
+.pk-tools .pk-fac .lbl{color:var(--teal);white-space:nowrap}
+.pk-tools .pk-fac .sub{color:var(--dim);font-size:9.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk-tools .pk-fac-sub{flex:0 0 100%;grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.pk-tools .pk-fac-sub[hidden]{display:none}
+.pk-tools .pk-fac-sub button{font-size:10px;padding:4px 5px;gap:4px;justify-content:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
 /* 頂部收起掣：一行細字，唔佔位 */
 .pk-tools .pk-fold{flex:0 0 100%;grid-column:1/-1;justify-content:center;font-size:10px;letter-spacing:.6px;
   color:var(--dim);background:none;border:0;padding:0;margin:-1px 0 1px;min-height:14px}
@@ -987,6 +998,15 @@ setInterval(loadRadar, 720000);
     <button id="open-trail" class="pk-list">山徑 167</button>
     <button id="open-meter" class="pk-list">咪錶 17,635</button>
     <button id="open-cafe" class="pk-list">Cafe 446</button>
+    <button id="pk-fac" class="pk-fac" aria-expanded="false" aria-controls="pk-fac-sub">
+      <span class="lbl">▸ 設施</span><span class="sub">廁所 · 出口 · 油站 · 醫院</span>
+    </button>
+    <div id="pk-fac-sub" class="pk-fac-sub" hidden>
+      <button id="tg-toilets" aria-pressed="false">廁所</button>
+      <button id="tg-mtr" aria-pressed="false">地鐵出口</button>
+      <button id="tg-fuel" aria-pressed="false">油站</button>
+      <button id="tg-hosp" aria-pressed="false">醫院</button>
+    </div>
     <button id="open-info" class="pk-list pk-info">ⓘ 功能說明</button>
   </div>
 
@@ -1157,18 +1177,26 @@ setInterval(loadRadar, 720000);
       <li>可搜尋路線名／地區／起點；標距柱可獨立開關，行山時對柱號確認位置。</li>
     </ul>
 
-    <h3 class="wn-h">⑦ 空位通知（Web Push，免費）</h3>
+    <h3 class="wn-h">⑦ 設施 · 廁所／地鐵出口／油站／醫院</h3>
+    <ul class="wn-list">
+      <li>圖層面板新增<b>「設施」</b>一行：撳開見到 <b>廁所</b>、<b>地鐵出口</b>（有出口編號，例如「出口 B」）、<b>油站</b>、<b>醫院</b> 四個獨立開關，可同時開。</li>
+      <li>地圖上以圓形徽章顯示：<b>WC</b>（藍）、<b>M</b>（紅）、<b>F</b>（橙）、<b>H</b>（紫）；zoom ≥ 12 才出現，避免全港一次畫幾千點。</li>
+      <li>撳任何徽章見到名稱、類別（同油站品牌／醫院營運者／出口編號）以及一撳「路線」。</li>
+      <li><b>資料來源</b>：OpenStreetMap（ODbL），每週自動更新一次；廁所與油站屬社群記錄，可能有未收錄或已停用情況，只作位置參考。</li>
+    </ul>
+
+    <h3 class="wn-h">⑧ 空位通知（Web Push，免費）</h3>
     <ul class="wn-list">
       <li>加到主畫面後可開背景通知：指定停車場有空位就推送，撳通知直接跳去該場。</li>
       <li>唔使裝 App、唔使電話號碼、唔使帳號；隨時可關。</li>
     </ul>
 
-    <h3 class="wn-h">⑧ 一撳加到主畫面</h3>
+    <h3 class="wn-h">⑨ 一撳加到主畫面</h3>
     <ul class="wn-list">
       <li>手機瀏覽器「加到主畫面」即變成 App 圖示，有針 P icon、開得快、有背景更新。</li>
     </ul>
 
-    <h3 class="wn-h">⑨ 資料來源（Credit）</h3>
+    <h3 class="wn-h">⑩ 資料來源（Credit）</h3>
     <ul class="wn-list">
       <li><b>天氣、雷達、雨量</b>：香港天文台 Hong Kong Observatory（hko.gov.hk）。</li>
       <li><b>公眾假期</b>：香港特別行政區政府（1823／data.gov.hk）。</li>
@@ -1177,6 +1205,7 @@ setInterval(loadRadar, 720000);
       <li><b>Cafe</b>：Quality Life Coffee 咖啡店目錄（cafe.qualitylife.coffee）——店名、地址、電話、營業時間、簡介由該站整理。</li>
       <li><b>山徑、標距柱</b>：漁農自然護理署遠足徑資料（hiking.gov.hk）。</li>
       <li><b>地圖底圖</b>：© OpenStreetMap contributors。</li>
+      <li><b>設施圖層</b>（公共廁所／地鐵站出入口／油站／醫院）：© OpenStreetMap contributors，ODbL 1.0 授權；由 Overpass API 每週抓取，只顯示名稱與位置。</li>
       <li>以上資料版權屬各自機構／作者所有，本 App 只作免費轉載參考；如機構想更正或要求下架，通知我們即時處理。</li>
     </ul>
 
@@ -1189,9 +1218,10 @@ setInterval(loadRadar, 720000);
       <li><b>遠足徑同標距柱合併成一個掣</b>，一撳同時開山徑線同標距柱。</li>
       <li>頂部 4 格（總空位／有空位車場／私家車位／更新時間）由兩行改<b>一行四格</b>。</li>
       <li>手機加「ⓘ 功能說明」入口，唔再靠被隱藏嘅圖例。</li>
-      <li>每項外來資料加返來源 credit（見上面 ⑨）。</li>
+      <li>每項外來資料加返來源 credit（見上面 ⑩）。</li>
       <li><b>Cafe 名單改為每日 09:00 自動更新</b>（該站官方 API；新店自動加入、結業自動移除）。</li>
       <li><b>新增每日 10:30 健康檢查</b>：Worker 即時數據、運輸署咪錶來源、線上網站、各份 data 新鮮度；壞咗 GitHub 會發失敗通知。</li>
+      <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新。</li>
     </ul>
 
     <div class="wn-day"><span class="d">2026-11-24</span><span class="t">收費解析全面校正 <span class="wn-tag">最新</span></span></div>
@@ -1240,8 +1270,9 @@ setInterval(loadRadar, 720000);
 (function(){
   "use strict";
 
-  var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], pm:{}, mm:{}, cm:{}, tm:{}, map:null, booted:false };
-  var TG = { parks:true, meters:true, cafes:false, trails:false, posts:false, free:false };
+  var ST = { parks:[], meters:[], cafes:[], trails:[], posts:[], fac:[], pm:{}, mm:{}, cm:{}, tm:{}, map:null, booted:false };
+  var TG = { parks:true, meters:true, cafes:false, trails:false, posts:false, free:false,
+             toilets:false, mtr:false, fuel:false, hosp:false };
   var HL = -1;
   var LVC = {"易行":"#54d8c4","普通":"#ffd166","費力":"#ff9f43","難行":"#ff6b78",
              "非常難行":"#ff4d8d","未列入":"#3a4757"};
@@ -1318,6 +1349,29 @@ setInterval(loadRadar, 720000);
   function addCafeIcon(map){
     if (map.hasImage("cafe-cup")) return;
     map.addImage("cafe-cup", cafeIconImg(), {pixelRatio:2});
+  }
+
+  /* 設施徽章：同 P／咖啡杯同一套圓底視覺，用文字代替圖形（唔靠 glyph font） */
+  var FACC = {t:"#3b82f6", m:"#e11d48", f:"#f59e0b", h:"#8b5cf6"};
+  var FACG = {t:"WC", m:"M", f:"F", h:"H"};
+  function facIconImg(k){
+    var S = 48, cv = document.createElement("canvas");
+    cv.width = cv.height = S;
+    var g = cv.getContext("2d"), r = S / 2;
+    g.beginPath(); g.arc(r, r, r - 2, 0, Math.PI * 2);
+    g.fillStyle = FACC[k]; g.fill();
+    g.lineWidth = 5; g.strokeStyle = "rgba(7,10,16,.92)"; g.stroke();
+    g.fillStyle = "#ffffff";
+    g.font = "700 " + (k === "t" ? 19 : 24) + "px 'PingFang HK','Microsoft JhengHei',Arial,sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(FACG[k], r, r + 1);
+    return g.getImageData(0, 0, S, S);
+  }
+  function addFacIcons(map){
+    Object.keys(FACC).forEach(function(k){
+      if (map.hasImage("fac-" + k)) return;
+      map.addImage("fac-" + k, facIconImg(k), {pixelRatio:2});
+    });
   }
 
   /* ---------- tabs ---------- */
@@ -1502,12 +1556,32 @@ setInterval(loadRadar, 720000);
       }
     });
 
+    addFacIcons(map);
+    map.addSource("fac", {type:"geojson", data: facilitiesFC()});
+    /* 每類一個 layer，可有各自嘅最低 zoom（廁所最密，要 zoom 14 才畫） */
+    [["t",14],["m",13],["f",13],["h",11]].forEach(function(cfg){
+      var k = cfg[0];
+      map.addLayer({
+        id:"fac-" + k, type:"symbol", source:"fac", minzoom:cfg[1], filter:["==",["get","ty"],k],
+        layout:{
+          "visibility":"none",
+          "icon-image":"fac-" + k,
+          "icon-size":["interpolate",["linear"],["zoom"],12,.42,15,.62,18,.86],
+          "icon-allow-overlap":true, "icon-ignore-placement":true, "icon-padding":1
+        }
+      });
+    });
+
     map.on("click","park-icon", function(e){ parkPopup(e); });
     map.on("click","meter-dot", function(e){ meterPopup(e); });
     map.on("click","cafe-dot", function(e){ cafePopup(e); });
+    map.on("click","fac-t", function(e){ facPopup(e); });
+    map.on("click","fac-m", function(e){ facPopup(e); });
+    map.on("click","fac-f", function(e){ facPopup(e); });
+    map.on("click","fac-h", function(e){ facPopup(e); });
     map.on("click","post-dot", function(e){ postPopup(e); });
     map.on("click","trail-line", function(e){ trailPopup(e); });
-    ["park-icon","meter-dot","cafe-dot","post-dot","trail-line"].forEach(function(id){
+    ["park-icon","meter-dot","cafe-dot","fac-t","fac-m","fac-f","fac-h","post-dot","trail-line"].forEach(function(id){
       map.on("mouseenter", id, function(){ map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", id, function(){ map.getCanvas().style.cursor = ""; });
     });
@@ -1522,6 +1596,7 @@ setInterval(loadRadar, 720000);
     if (ST.cafes.length) map.getSource("cafes").setData(cafesFC());
     if (ST.trails.length) map.getSource("trails").setData(trailsFC());
     if (ST.posts.length) map.getSource("posts").setData(postsFC());
+    if (ST.fac.length) map.getSource("fac").setData(facilitiesFC());
     applyToggles();
   }
 
@@ -1547,6 +1622,12 @@ setInterval(loadRadar, 720000);
     return {type:"FeatureCollection", features:(ST.cafes||[]).map(function(c){
       return {type:"Feature", geometry:{type:"Point", coordinates:[c.lo,c.la]},
         properties:{n:c.n, a:c.a, d:c.d, h:c.h, x:c.x, u:c.u, t:c.t, s:c.s}};
+    })};
+  }
+  function facilitiesFC(){
+    return {type:"FeatureCollection", features:(ST.fac||[]).map(function(f){
+      return {type:"Feature", geometry:{type:"Point", coordinates:[f[3], f[2]]},
+        properties:{ty:f[0], n:f[1], x:f[4]||""}};
     })};
   }
   function trailsFC(){
@@ -1983,6 +2064,16 @@ setInterval(loadRadar, 720000);
       .addTo(ST.map);
   }
 
+  var FACN = {t:"公共廁所", m:"地鐵站出入口", f:"油站", h:"醫院"};
+  function facPopup(e){
+    var q = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
+    new maplibregl.Popup({maxWidth:"250px"}).setLngLat(lnglat)
+      .setHTML('<div class="pp"><h4>'+esc(q.n || FACN[q.ty] || "設施")+'</h4>'
+        + '<div class="sub">'+esc(FACN[q.ty] || "")+(q.x ? " · "+esc(q.x) : "")+'</div>'
+        + '<div class="row"><span>資料</span><span>OpenStreetMap</span></div>'
+        + actBtns(null, lnglat[1], lnglat[0]) + '</div>').addTo(ST.map);
+  }
+
   function postPopup(e){
     var q = e.features[0].properties;
     new maplibregl.Popup({maxWidth:"240px"}).setLngLat(e.features[0].geometry.coordinates)
@@ -2016,6 +2107,7 @@ setInterval(loadRadar, 720000);
     var f = TG.free ? [">=",["get","v"],3] : null;
     map.setFilter("park-icon", f); map.setFilter("park-halo", f);
     if (map.getLayer("meter-dot") && MI) map.setFilter("meter-dot", meterFilter());
+    vis("fac-t", TG.toilets); vis("fac-m", TG.mtr); vis("fac-f", TG.fuel); vis("fac-h", TG.hosp);
   }
   [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],
    ["tg-free","free"]].forEach(function(pair){
@@ -2036,6 +2128,49 @@ setInterval(loadRadar, 720000);
       b.setAttribute("aria-pressed", TG.trails);
       applyToggles();
     });
+  })();
+
+  /* 設施：一條全寬組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院） */
+  function facList(){
+    var l = [];
+    if (TG.toilets) l.push("t");
+    if (TG.mtr) l.push("m");
+    if (TG.fuel) l.push("f");
+    if (TG.hosp) l.push("h");
+    return l;
+  }
+  function facAny(){ return facList().length > 0; }
+  (function(){
+    var b = document.getElementById("pk-fac"), sub = document.getElementById("pk-fac-sub");
+    if (!b || !sub) return;
+    var pairs = [["tg-toilets","toilets","廁所"],["tg-mtr","mtr","地鐵出口"],
+                 ["tg-fuel","fuel","油站"],["tg-hosp","hosp","醫院"]];
+    var lbl = b.querySelector(".lbl"), sum = b.querySelector(".sub");
+    function paint(){
+      var on = [];
+      pairs.forEach(function(p){
+        var el = document.getElementById(p[0]);
+        if (el) el.setAttribute("aria-pressed", TG[p[1]]);
+        if (TG[p[1]]) on.push(p[2]);
+      });
+      sum.textContent = on.length ? on.join(" · ") : "廁所 · 出口 · 油站 · 醫院";
+      lbl.textContent = (b.getAttribute("aria-expanded") === "true" ? "▾" : "▸") + " 設施";
+    }
+    b.addEventListener("click", function(){
+      var open = b.getAttribute("aria-expanded") === "true";
+      b.setAttribute("aria-expanded", String(!open));
+      sub.hidden = open;
+      paint();
+    });
+    pairs.forEach(function(p){
+      var el = document.getElementById(p[0]);
+      if (!el) return;
+      el.addEventListener("click", function(){
+        TG[p[1]] = !TG[p[1]];
+        paint(); applyToggles();
+      });
+    });
+    paint();
   })();
 
   /* ---------- search ---------- */
@@ -2886,11 +3021,15 @@ setInterval(loadRadar, 720000);
       fetch("data/parking.json"+bust).then(function(r){ return r.json(); }),
       fetch("data/meters.json"+bust).then(function(r){ return r.json(); }),
       fetch("data/cafes.json"+bust).then(function(r){ return r.json(); }),
-      fetch("data/trails.json"+bust).then(function(r){ return r.json(); })
+      fetch("data/trails.json"+bust).then(function(r){ return r.json(); }),
+      fetch("data/facilities.json"+bust).then(function(r){ return r.ok ? r.json() : null; })
+        .catch(function(){ return null; })
     ]).then(function(res){
-      var pk = res[0], mt = res[1], fc = res[2], tr = res[3];
+      var pk = res[0], mt = res[1], fc = res[2], tr = res[3], fa = res[4];
       ST.parks = pk.parks || []; ST.parksStatic = pk.parks || []; ST.meters = mt.spaces || [];
       ST.cafes = fc.cafes || []; ST.trails = tr.trails || []; ST.posts = tr.posts || [];
+      ST.fac = (fa && fa.items) || [];
+      ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr; ST.fm = fa;
       ST.pm = pk; ST.mm = mt; ST.cm = fc; ST.tm = tr;
       MI.cache = null;
       var mb = document.getElementById("open-meter");

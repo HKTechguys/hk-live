@@ -1,7 +1,20 @@
 # hk-live
 
-香港即時資訊單頁（即時天氣／雨量／假期、停車場、路邊感應咪錶、手沖咖啡、漁護署遠足徑），
+香港即時資訊單頁（即時天氣／雨量／假期、停車場、路邊感應咪錶、手沖咖啡、漁護署遠足徑、設施），
 地圖頁的圖層由左下角開關控制，清單用底部面板。
+
+## 設施圖層（OSM，每週更新）
+
+`data/facilities.json` 由 `tools/refresh_facilities.py` 每週一 10:00 HKT（`facilities.yml`）更新：
+
+- 公共廁所 `amenity=toilets`
+- 地鐵站出入口 `railway=subway_entrance`（連出口編號）
+- 油站 `amenity=fuel`
+- 醫院 `amenity=hospital`
+
+以 bbox 向 Overpass API 抓，再用粗略香港邊界多邊形隔走深圳／內地結果；
+資料 © OpenStreetMap contributors，ODbL 1.0，只顯示名稱與位置。
+地圖上分別以 WC（藍）、M（紅）、F（橙）、H（紫）徽章顯示，各自有最低 zoom（廁所最密，要 zoom ≥14）。
 
 ## 咪錶即時（開住面板就更新）
 

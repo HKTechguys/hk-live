@@ -63,7 +63,8 @@ def check_site():
     try:
         code, body = fetch(SITE + "index.html?hc=" + str(int(datetime.now().timestamp())))
         txt = body.decode("utf-8", "replace")
-        missing = [n for n in ('id="p-park"', 'id="tab-map"', "hk-live-push") if n not in txt]
+        missing = [n for n in ('id="p-park"', 'id="tab-map"', "hk-live-push", 'id="pk-fac"', "fac-t")
+                   if n not in txt]
         if missing:
             problems.append("線上 index.html 缺少 %s（Pages 可能未部署）" % "、".join(missing))
         else:
@@ -85,7 +86,8 @@ def age_hours(val):
 
 def check_data():
     for name, limit_h, fatal_h in (("cafes.json", 36, 96), ("parking.json", 12, 48),
-                                   ("meters.json", 12, 48), ("park_fees.json", 240, 480)):
+                                   ("meters.json", 12, 48), ("park_fees.json", 240, 480),
+                                   ("facilities.json", 720, 2160)):
         p = os.path.join(ROOT, "data", name)
         if not os.path.exists(p):
             problems.append("data/%s 唔存在" % name)

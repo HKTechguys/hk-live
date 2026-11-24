@@ -1,0 +1,31 @@
+name: refresh facilities
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"      # 10:00 HKT 逢星期一
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  facilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refresh facilities from OpenStreetMap
+        run: python tools/refresh_facilities.py
+      - name: Commit if changed
+        run: |
+          git config user.name "hk-live-bot"
+          git config user.email "bot@hk-live.local"
+          git add data/facilities.json
+          if git diff --quiet --cached; then
+            echo "no change"
+          else
+            git commit -m "data: refresh facilities $(date -u +%F)"
+            git push
+          fi
