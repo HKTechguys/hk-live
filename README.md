@@ -39,3 +39,5 @@ workflow 會先 snapshot 上一版，跑完再比對，命中「佔用中 → �
 
 未設定 secret 時 workflow 只會把訊息印在 log、不會失敗。
 想改用官方 WhatsApp Cloud API／Twilio，把 `tools/notify_whatsapp.py` 最後那段發送換掉即可。
+
+<!-- publish probe 074145 -->
