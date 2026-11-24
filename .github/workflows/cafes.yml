@@ -1,0 +1,31 @@
+name: refresh cafes
+
+on:
+  schedule:
+    - cron: "0 1 * * *"      # 09:00 HKT 每日
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cafes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refresh cafe list from qualitylife API
+        run: python tools/refresh_cafes.py
+      - name: Commit if changed
+        run: |
+          git config user.name "hk-live-bot"
+          git config user.email "bot@hk-live.local"
+          git add data/cafes.json
+          if git diff --quiet --cached; then
+            echo "no change"
+          else
+            git commit -m "data: refresh cafes $(date -u +%F)"
+            git push
+          fi

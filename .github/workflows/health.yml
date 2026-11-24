@@ -1,0 +1,17 @@
+name: health check
+
+on:
+  schedule:
+    - cron: "30 2 * * *"     # 10:30 HKT 每日
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check live data pipeline
+        run: python tools/health_check.py
