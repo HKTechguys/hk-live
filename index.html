@@ -536,13 +536,13 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 </head>
 <body>
 <nav class="tabbar" role="tablist" aria-label="頁面分頁">
-  <button role="tab" id="tab-now" aria-selected="true" aria-controls="p-now">即時</button>
-  <button role="tab" id="tab-map" aria-selected="false" aria-controls="p-park">地圖</button>
+  <button role="tab" id="tab-now" aria-selected="false" aria-controls="p-now">即時</button>
+  <button role="tab" id="tab-map" aria-selected="true" aria-controls="p-park">地圖</button>
   <span class="sp"></span>
   <span class="live" id="tab-live"></span>
 </nav>
 
-<section class="tabpage on" id="p-now" role="tabpanel" aria-labelledby="tab-now">
+<section class="tabpage" id="p-now" role="tabpanel" aria-labelledby="tab-now">
 <div class="wind"></div>
 <div class="wrap">
   <div class="banner" id="banner"></div>
@@ -948,7 +948,7 @@ loadRadar();
 setInterval(()=>load(URL_NOW, renderNow, "now"), 300000);
 setInterval(loadRadar, 720000);
 </script>
-<section class="tabpage" id="p-park" role="tabpanel" aria-labelledby="tab-map">
+<section class="tabpage on" id="p-park" role="tabpanel" aria-labelledby="tab-map">
   <div id="map"></div>
 
   <div class="pk-hud">
@@ -2900,7 +2900,8 @@ setInterval(loadRadar, 720000);
   document.addEventListener("DOMContentLoaded", function(){
     wireSearch(); wireCafeUI(); wireTrailUI(); wireMeterUI(); wtLoad();
     var h = (location.hash || "").replace("#", ""), base = h.split("?")[0];
-    if (["now","map","park","cafe","trail","meter"].indexOf(base) >= 0) go(h);
+    // 一開 app 直接落「地圖」頁（除非 hash 指定 now）
+    go(["now","map","park","cafe","trail","meter"].indexOf(base) >= 0 ? h : "map");
     if (h.indexOf("?") >= 0) hashJump();
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
