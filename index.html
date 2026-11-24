@@ -971,8 +971,8 @@ setInterval(loadRadar, 720000);
     <div class="pk-results" id="results"></div>
   </div>
 
-  <div class="pk-tools folded" id="layer-tools">
-    <button id="pk-fold" class="pk-fold" aria-expanded="false" aria-controls="layer-tools">☰ 圖層</button>
+  <div class="pk-tools" id="layer-tools">
+    <button id="pk-fold" class="pk-fold" aria-expanded="true" aria-controls="layer-tools">✕ 收起</button>
     <div class="pk-watch" id="pk-watch" hidden></div>
     <button id="tg-parks" aria-pressed="true">停車場</button>
     <button id="tg-meters" aria-pressed="true">感應咪錶</button>
@@ -2925,8 +2925,8 @@ setInterval(loadRadar, 720000);
   document.addEventListener("DOMContentLoaded", function(){
     wireSearch(); wireCafeUI(); wireTrailUI(); wireMeterUI(); wtLoad();
     var h = (location.hash || "").replace("#", ""), base = h.split("?")[0];
-    // 一開 app 直接落「地圖」頁（除非 hash 指定 now）
-    go(["now","map","park","cafe","trail","meter"].indexOf(base) >= 0 ? h : "map");
+    // 一開 app 一定係地圖，唔會自動彈任何 sheet；只有通知深層連結 #park?mt= 才跟
+    go((base === "park" && h.indexOf("mt=") >= 0) ? h : "map");
     if (h.indexOf("?") >= 0) hashJump();
     loadData();
     setInterval(loadData, 5 * 60 * 1000);
