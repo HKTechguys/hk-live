@@ -1,0 +1,22 @@
+name: smoke test
+
+on:
+  push:
+    paths:
+      - "tools/refresh_cafes.py"
+      - "tools/health_check.py"
+      - ".github/workflows/smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cafe refresh dry-run
+        run: python tools/refresh_cafes.py --dry-run
+      - name: Health check
+        run: python tools/health_check.py
