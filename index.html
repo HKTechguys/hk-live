@@ -314,6 +314,10 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .wn-day .t{font-size:12.5px;color:var(--ink)}
 .wn-tag{font-size:9.5px;line-height:1.6;padding:0 6px;border:1px solid currentColor;
   border-radius:5px;color:var(--teal);vertical-align:1px;margin-left:2px}
+.wn-more{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;color:var(--teal);
+  background:rgba(84,216,196,.1);border:1px solid rgba(84,216,196,.4);border-radius:8px;
+  padding:8px 12px;margin:16px 0 2px;cursor:pointer;touch-action:manipulation}
+.pk-info{display:none}
 
 /* ---------- 山徑清單 ---------- */
 .tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
@@ -503,6 +507,8 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
   .tabbar .live{display:none}
   .pk-search{width:calc(100% - 20px);right:10px;top:calc(var(--tabh) + 56px)}
   .pk-legend{display:none}
+  .pk-info{display:flex;grid-column:1/-1;justify-content:center;color:var(--teal);
+    border-color:rgba(84,216,196,.35)}
   .pk-hud{gap:5px}
   .pk-chip{padding:4px 7px}
   .pk-chip i{font-size:8.5px;letter-spacing:0}
@@ -968,6 +974,7 @@ setInterval(loadRadar, 720000);
     <button id="open-trail" class="pk-list">山徑 167 段</button>
     <button id="open-meter" class="pk-list">咪錶 20,735 位</button>
     <button id="open-cafe" class="pk-list">Cafe 446 間</button>
+    <button id="open-info" class="pk-list pk-info">ⓘ 功能說明</button>
   </div>
 
   <div class="pk-legend">
@@ -1183,6 +1190,7 @@ setInterval(loadRadar, 720000);
       <li>六日夜間價冇獨立欄位，六日只顯示日間價。</li>
     </ul>
 
+    <button type="button" class="wn-more" id="open-about2">資料來源與免責聲明 ›</button>
     <p class="about-sub">資料來源：香港出行易 DRSS、運輸署、領展、越秀、港鐵、機管局、漁護署、香港天文台、用戶回報。詳見「資料來源與免責聲明」。</p>
   </div>
 </section>
@@ -1299,10 +1307,15 @@ setInterval(loadRadar, 720000);
     document.body.classList.toggle("sheet-on", anySheetOn());
   }
   function openSheet(id){
+    // 一次只開一個 sheet，避免疊住
+    Array.prototype.forEach.call(document.querySelectorAll(".sheet"), function(s){
+      if (s.id !== id && s.classList.contains("on")) closeSheet(s.id);
+    });
     document.getElementById(id).classList.add("on");
     syncSheetState();
     if (id === "p-meter") liveStart();
     if (id === "p-cafe") renderCafes();
+    var s = document.getElementById(id); if (s) s.scrollTop = 0;
   }
   function closeSheet(id){
     document.getElementById(id).classList.remove("on");
@@ -1316,6 +1329,8 @@ setInterval(loadRadar, 720000);
   document.getElementById("open-cafe").addEventListener("click", function(){ openSheet("p-cafe"); });
   document.getElementById("open-about").addEventListener("click", function(){ openSheet("p-about"); });
   document.getElementById("open-whatsnew").addEventListener("click", function(){ openSheet("p-whatsnew"); });
+  document.getElementById("open-info").addEventListener("click", function(){ openSheet("p-whatsnew"); });
+  document.getElementById("open-about2").addEventListener("click", function(){ openSheet("p-about"); });
 
   /* ---------- map ---------- */
   var MAP_STYLE = {
