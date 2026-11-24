@@ -211,14 +211,6 @@ body.sheet-on .hk-install{display:none}
 .pk-tools button.pk-list{color:var(--ink);border-color:rgba(255,255,255,.22)}
 .pk-tools button.pk-list::before{display:none}
 .pk-tools button.pk-list::after{content:"▸";color:var(--dim);font-size:10px}
-/* 圖層掣：預設收起，只留一粒細掣 */
-.pk-tools .pk-fold{flex:0 0 auto;font-size:11px;padding:4px 8px;color:var(--ink);
-  border-color:rgba(255,255,255,.24);background:rgba(9,15,21,.5)}
-.pk-tools .pk-fold::before{display:none}
-.pk-tools .pk-fold::after{display:none}
-.pk-tools.folded{padding:4px;gap:0;right:auto;width:-moz-fit-content;width:fit-content;max-width:none}
-.pk-tools.folded > *:not(.pk-fold){display:none}
-.pk-tools.folded .pk-fold{font-size:11.5px;padding:6px 10px}
 /* Cafe 用咖啡杯取代圓點（同地圖標記同一形狀） */
 .pk-tools button#tg-cafes::before,.pk-tools button#tg-cafes[aria-pressed="true"]::before{
   content:"";width:13px;height:13px;border-radius:0;background:var(--dim);flex:none;
@@ -972,7 +964,6 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-tools" id="layer-tools">
-    <button id="pk-fold" class="pk-fold" aria-expanded="true" aria-controls="layer-tools">✕ 收起</button>
     <div class="pk-watch" id="pk-watch" hidden></div>
     <button id="tg-parks" aria-pressed="true">停車場</button>
     <button id="tg-meters" aria-pressed="true">感應咪錶</button>
@@ -1307,22 +1298,6 @@ setInterval(loadRadar, 720000);
   TABS.forEach(function(t){
     document.getElementById(t[0]).addEventListener("click", function(){ showTab(t[0]); });
   });
-
-  /* ---------- 圖層面板：入 app 預設收起 ---------- */
-  function foldTools(f){
-    var lt = document.getElementById("layer-tools"), fb = document.getElementById("pk-fold");
-    if (!lt || !fb) return;
-    lt.classList.toggle("folded", f);
-    fb.setAttribute("aria-expanded", f ? "false" : "true");
-    fb.textContent = f ? "☰ 圖層" : "✕ 收起";
-    if (typeof placeInstall === "function") placeInstall();
-  }
-  (function(){
-    var fb = document.getElementById("pk-fold");
-    if (fb) fb.addEventListener("click", function(){
-      foldTools(!document.getElementById("layer-tools").classList.contains("folded"));
-    });
-  })();
 
   /* ---------- sheets ---------- */
   function anySheetOn(){
