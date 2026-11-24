@@ -303,6 +303,17 @@ body.sheet-on .pk-tools,body.sheet-on .pk-legend{display:none}
 .about-p{font-size:12.5px;line-height:1.75;color:#c9d6de;margin:0 0 12px}
 .about-sub{font-size:11px;line-height:1.7;color:var(--dim);margin:14px 0 0;
   padding-top:10px;border-top:1px solid var(--line)}
+/* 功能一覽／更新紀錄 */
+.wn-h{font-size:12.5px;color:var(--teal);margin:18px 0 6px;letter-spacing:.02em;font-weight:600}
+.wn-h:first-of-type{margin-top:6px}
+.wn-list{margin:0 0 4px;padding-left:17px;font-size:12.5px;line-height:1.8;color:#c9d6de}
+.wn-list li{margin:0 0 4px}
+.wn-list b{color:var(--ink);font-weight:600}
+.wn-day{display:flex;gap:8px;align-items:baseline;margin:16px 0 5px;flex-wrap:wrap}
+.wn-day .d{font-size:11px;color:var(--teal);font-variant-numeric:tabular-nums}
+.wn-day .t{font-size:12.5px;color:var(--ink)}
+.wn-tag{font-size:9.5px;line-height:1.6;padding:0 6px;border:1px solid currentColor;
+  border-radius:5px;color:var(--teal);vertical-align:1px;margin-left:2px}
 
 /* ---------- 山徑清單 ---------- */
 .tr-levels{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
@@ -969,6 +980,7 @@ setInterval(loadRadar, 720000);
     <span class="ce"></span>Cafe 咖啡店（可切換）<br>
     <span style="color:#8fa3ad">咪錶位需 zoom ≥ 13 才顯示</span><br>
     <button type="button" id="open-about" class="about-btn">資料來源與免責聲明</button>
+    <button type="button" id="open-whatsnew" class="about-btn">功能一覽與更新紀錄</button>
   </div>
 
   <div class="hk-install" id="hk-install" hidden>
@@ -1068,6 +1080,110 @@ setInterval(loadRadar, 720000);
     <p class="about-p">資料由政府公開資料提供,以停車場實際為準。本手機應用程式資料只供參考之用,並不保證所列資料的準確性及可靠性。</p>
     <p class="about-p">如你使用有關資料而引致任何損失,汽車台概不承擔任何責任。</p>
     <p class="about-sub">資料來源：香港出行易（hkemobility.gov.hk）DRSS 停車場圖層、運輸署實時車位、領展／港鐵／機管局公布收費、用戶回報收費，以及漁護署山徑圖層。</p>
+  </div>
+</section>
+
+<section class="sheet" id="p-whatsnew">
+  <div class="sheet-head">
+    <h2>功能一覽與更新紀錄</h2>
+    <button class="sheet-close" data-close="p-whatsnew">收起</button>
+  </div>
+  <div class="inner">
+    <p class="sheet-sub">HK Live 係一個免費、無廣告、唔使登入嘅香港即時地圖。下面逐項講清楚每個功能做乜、數據幾時更新、邊度睇得到。</p>
+
+    <h3 class="wn-h">① 即時天氣與雷達</h3>
+    <ul class="wn-list">
+      <li>開 App 第一頁就係香港天文台最新天氣、警告同雷達圖，落雨前一眼睇到。</li>
+      <li>同停車場／咪錶共用同一個刷新節奏，時間戳一律顯示香港時間。</li>
+    </ul>
+
+    <h3 class="wn-h">② 全港停車場 · 1,654 個</h3>
+    <ul class="wn-list">
+      <li><b>P 釘顏色＝現時空位</b>：青（≥20）、黃（5–19）、橙（1–4）、紅（0）、灰（今次冇讀數）。</li>
+      <li>撳 P 釘會見：地址、私家車位、更新時間、<b>收費</b>、室內高度限制、複製地址、規劃路線。</li>
+      <li>數據每 2 分鐘由香港出行易拉一次；開住個站每 10 分鐘自動更新，左上 <b>↻</b> 可以即時手動拉。</li>
+      <li>「只看有空位」可過濾走已滿／冇讀數嘅場。</li>
+    </ul>
+
+    <h3 class="wn-h">③ 停車場收費（多來源）</h3>
+    <ul class="wn-list">
+      <li><b>來源</b>：香港出行易收費原文、領展 145 個場、越秀 55 個場、港鐵 6 個站場、機場 3 個場，加埋<b>用戶回報</b>。</li>
+      <li>營運商官網價優先於出行易原文，因為官網最準、最新。</li>
+      <li><b>按現時段自動切價</b>：而家係夜間時段就顯示「夜泊參考 $X/小時」，日間就顯示「時租參考」。</li>
+      <li><b>星期六日自動切價</b>：有六日價嘅場（164 個），逢星期六日顯示「六日參考 $X/小時」。</li>
+      <li>半小時制會換算成每小時（例：$7/半小時 → $14/小時）；「首半小時 $18、每小時 $27」會取 $27，唔會當 $18。</li>
+      <li>日泊／夜泊「套票價」（例如夜泊 $90 包一晚）<b>唔會</b>當成每小時，避免誤導。</li>
+      <li>見到價錢唔對？撳 popup 內「💰 我知價錢」即刻回報，其他人下次就睇到。</li>
+    </ul>
+
+    <h3 class="wn-h">④ 咪錶 · 20,735 個位</h3>
+    <ul class="wn-list">
+      <li>預設只顯示<b>私家車（A 類）</b>車位，避免貨車／旅遊巴位混淆；亦可切換車輛種類。</li>
+      <li>撳錶位見：街道、區份、收費柱編號、可用狀態；地圖要 zoom ≥ 13 才顯示，避免全港一次畫兩萬粒點。</li>
+    </ul>
+
+    <h3 class="wn-h">⑤ Cafe · 446 間 × 200 米停車/咪錶</h3>
+    <ul class="wn-list">
+      <li>每張 Cafe 卡自動顯示兩個 badge：<b>🅿 最近停車場</b>（名＋距離）、<b>⏱ 200 米內咪錶</b>（數量＋最近距離＋現時有位數）。</li>
+      <li>兩個獨立 toggle：<b>「🅿 200 米內停車場」</b>、<b>「⏱ 200 米內咪錶」</b>。兩個同開＝有停車場<b>或</b>有咪錶；只開一個＝必須有該項。</li>
+      <li>搵咖啡店前先睇泊車，唔使兜冤枉路。</li>
+    </ul>
+
+    <h3 class="wn-h">⑥ 山徑 · 167 段＋標距柱</h3>
+    <ul class="wn-list">
+      <li>漁護署官方遠足徑圖層：線位、官方長度、起點終點、難度、地區。</li>
+      <li>可搜尋路線名／地區／起點；標距柱可獨立開關，行山時對柱號確認位置。</li>
+    </ul>
+
+    <h3 class="wn-h">⑦ 空位通知（Web Push，免費）</h3>
+    <ul class="wn-list">
+      <li>加到主畫面後可開背景通知：指定停車場有空位就推送，撳通知直接跳去該場。</li>
+      <li>唔使裝 App、唔使電話號碼、唔使帳號；隨時可關。</li>
+    </ul>
+
+    <h3 class="wn-h">⑧ 一撳加到主畫面</h3>
+    <ul class="wn-list">
+      <li>手機瀏覽器「加到主畫面」即變成 App 圖示，有針 P icon、開得快、有背景更新。</li>
+    </ul>
+
+    <h3 class="wn-h">更新紀錄</h3>
+    <div class="wn-day"><span class="d">2026-11-24</span><span class="t">收費解析全面校正 <span class="wn-tag">最新</span></span></div>
+    <ul class="wn-list">
+      <li>康怡廣場由「$18/小時」修正為 <b>$27/小時</b>（原文：首半小時 $18／每小時 $27）。</li>
+      <li>「首半小時」唔再當成時租；只有半小時制嘅場才 ×2 換算。</li>
+      <li>夜泊／日泊套票唔再誤當每小時（紅磡邨二期、北角匯、新達廣場等已修正）。</li>
+      <li>六日價唔會再抽到六日日泊或「第三小時起」嘅分段價。</li>
+      <li>全站 297 個有收費文字嘅場重新回歸檢查，0 個對唔上原文。</li>
+      <li>新增「功能一覽與更新紀錄」（就係你而家睇呢頁）。</li>
+    </ul>
+
+    <div class="wn-day"><span class="d">2026-11-23</span><span class="t">收費＋日夜／六日切價</span></div>
+    <ul class="wn-list">
+      <li>接入領展（145 場）、港鐵（6 站）、機場（3 場）、越秀（55 場）官網收費。</li>
+      <li>按香港現時時間自動切換日／夜價，跨午夜時段（23:00–07:00）都處理到。</li>
+      <li>星期六日自動切六日價。</li>
+      <li>修正「$8/小時」誤抽（麗翠苑原本抽到 08:00 嘅「8」）。</li>
+      <li>加入用戶回報價錢（💰 我知價錢），資料存 Cloudflare D1。</li>
+      <li>加入資料來源與免責聲明頁。</li>
+    </ul>
+
+    <div class="wn-day"><span class="d">2026-11-22</span><span class="t">Cafe 交叉泊車＋全港 P 釘</span></div>
+    <ul class="wn-list">
+      <li>Cafe 卡加入 200 米停車場／咪錶雙 badge 同兩個獨立 toggle（OR／AND）。</li>
+      <li>停車場圖層擴至全港 1,654 場（包含非運輸署場）。</li>
+      <li>加手動 ↻ 刷新、10 分鐘 ambient 更新、UTC→香港時間修正。</li>
+      <li>Web Push 空位通知上線（Cloudflare Worker，免費）。</li>
+    </ul>
+
+    <h3 class="wn-h">已知限制（講明白好過估）</h3>
+    <ul class="wn-list">
+      <li>全港只有約 300 個場有公開收費文字；其餘要靠營運商官網或用戶回報，<b>官方冇統一 price list</b>。</li>
+      <li>「首 2 小時」分段收費只顯示首段換算價，之後嘅價要睇 popup 原文。</li>
+      <li>14 個越秀場唔在出行易名單內，所以地圖暫時冇點（俊民苑、兆山苑等）。</li>
+      <li>六日夜間價冇獨立欄位，六日只顯示日間價。</li>
+    </ul>
+
+    <p class="about-sub">資料來源：香港出行易 DRSS、運輸署、領展、越秀、港鐵、機管局、漁護署、香港天文台、用戶回報。詳見「資料來源與免責聲明」。</p>
   </div>
 </section>
 <script src="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -1199,6 +1315,7 @@ setInterval(loadRadar, 720000);
   document.getElementById("open-trail").addEventListener("click", function(){ openSheet("p-trail"); });
   document.getElementById("open-cafe").addEventListener("click", function(){ openSheet("p-cafe"); });
   document.getElementById("open-about").addEventListener("click", function(){ openSheet("p-about"); });
+  document.getElementById("open-whatsnew").addEventListener("click", function(){ openSheet("p-whatsnew"); });
 
   /* ---------- map ---------- */
   var MAP_STYLE = {
