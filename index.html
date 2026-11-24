@@ -1180,7 +1180,8 @@ setInterval(loadRadar, 720000);
     <h3 class="wn-h">⑦ 設施 · 廁所／地鐵出口／油站／醫院</h3>
     <ul class="wn-list">
       <li>圖層面板新增<b>「設施」</b>一行：撳開見到 <b>廁所</b>、<b>地鐵出口</b>（有出口編號，例如「出口 B」）、<b>油站</b>、<b>醫院</b> 四個獨立開關，可同時開。</li>
-      <li>地圖上以圓形徽章顯示：<b>WC</b>（藍）、<b>M</b>（紅）、<b>F</b>（橙）、<b>H</b>（紫）；zoom ≥ 12 才出現，避免全港一次畫幾千點。</li>
+      <li>地圖上以徽章顯示：<b>WC</b>（藍圓）、<b>H</b>（紫圓）、地鐵出口直接寫<b>出口編號</b>（紅方牌，例如 <b>A1</b>、<b>D2</b>；無編號一律「M」）、油站用<b>品牌色長牌</b>（Shell 黃底紅字／Esso 白底藍框／Caltex 白底紅字／Sinopec 紅底白字／中石油 紅底黃字／其他「油」）。</li>
+      <li>廁所 zoom ≥ 14、出口／油站 ≥ 13、醫院 ≥ 11 才出現，避免全港一次畫幾千點。</li>
       <li>撳任何徽章見到名稱、類別（同油站品牌／醫院營運者／出口編號）以及一撳「路線」。</li>
       <li><b>資料來源</b>：OpenStreetMap（ODbL），每週自動更新一次；廁所與油站屬社群記錄，可能有未收錄或已停用情況，只作位置參考。</li>
     </ul>
@@ -1221,7 +1222,7 @@ setInterval(loadRadar, 720000);
       <li>每項外來資料加返來源 credit（見上面 ⑩）。</li>
       <li><b>Cafe 名單改為每日 09:00 自動更新</b>（該站官方 API；新店自動加入、結業自動移除）。</li>
       <li><b>新增每日 10:30 健康檢查</b>：Worker 即時數據、運輸署咪錶來源、線上網站、各份 data 新鮮度；壞咗 GitHub 會發失敗通知。</li>
-      <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新。</li>
+      <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新；地鐵出口徽章改寫<b>出口編號</b>（A1／D2…），油站改<b>品牌色徽章</b>（Shell／Esso／Caltex／Sinopec／中石油）。</li>
     </ul>
 
     <div class="wn-day"><span class="d">2026-11-24</span><span class="t">收費解析全面校正 <span class="wn-tag">最新</span></span></div>
@@ -1371,6 +1372,68 @@ setInterval(loadRadar, 720000);
     Object.keys(FACC).forEach(function(k){
       if (map.hasImage("fac-" + k)) return;
       map.addImage("fac-" + k, facIconImg(k), {pixelRatio:2});
+    });
+  }
+  /* MTR 出口：方角徽章直接寫出口編號（A1、D2…） */
+  function exitIconImg(code){
+    var S = 64, cv = document.createElement("canvas");
+    cv.width = cv.height = S;
+    var g = cv.getContext("2d"), pad = 4;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(pad, pad, S - pad * 2, S - pad * 2, 9);
+    else g.rect(pad, pad, S - pad * 2, S - pad * 2);
+    g.fillStyle = "#d81e2c"; g.fill();
+    g.lineWidth = 4; g.strokeStyle = "rgba(7,10,16,.92)"; g.stroke();
+    g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle";
+    var t = String(code || "M"), size = t.length >= 3 ? 21 : 27;
+    g.font = "700 " + size + "px 'Helvetica Neue',Arial,sans-serif";
+    g.fillText(t, S / 2, S / 2 + 1);
+    return g.getImageData(0, 0, S, S);
+  }
+  /* 油站：品牌顏色 + 品牌字樣徽章（唔使用官方商標圖檔） */
+  var FBRAND = {
+    shell:{t:"Shell", bg:"#ffd500", fg:"#d40511", bd:"rgba(7,10,16,.8)"},
+    esso:{t:"Esso", bg:"#ffffff", fg:"#e2231a", bd:"#123a8f"},
+    caltex:{t:"Caltex", bg:"#ffffff", fg:"#d6001c", bd:"#1b3f94"},
+    sinopec:{t:"Sinopec", bg:"#e60012", fg:"#ffffff", bd:"rgba(7,10,16,.85)"},
+    petrochina:{t:"中石油", bg:"#d81e06", fg:"#ffd200", bd:"rgba(7,10,16,.85)"},
+    cnooc:{t:"中海油", bg:"#0072bc", fg:"#ffffff", bd:"rgba(7,10,16,.85)"},
+    other:{t:"油", bg:"#f59e0b", fg:"#0b1016", bd:"rgba(7,10,16,.85)"}
+  };
+  function brandIconImg(key){
+    var B = FBRAND[key] || FBRAND.other;
+    var W = 132, H = 60, cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    var g = cv.getContext("2d"), pad = 4;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(pad, pad, W - pad * 2, H - pad * 2, 10);
+    else g.rect(pad, pad, W - pad * 2, H - pad * 2);
+    g.fillStyle = B.bg; g.fill();
+    g.lineWidth = 4; g.strokeStyle = B.bd; g.stroke();
+    g.fillStyle = B.fg; g.textAlign = "center"; g.textBaseline = "middle";
+    var size = 26;
+    g.font = "700 " + size + "px 'PingFang HK','Microsoft JhengHei',Arial,sans-serif";
+    var tw = g.measureText(B.t).width;
+    while (tw > W - 18 && size > 12){
+      size -= 2;
+      g.font = "700 " + size + "px 'PingFang HK','Microsoft JhengHei',Arial,sans-serif";
+      tw = g.measureText(B.t).width;
+    }
+    g.fillText(B.t, W / 2, H / 2 + 1);
+    return g.getImageData(0, 0, W, H);
+  }
+  function addFacDynIcons(map){
+    if (!map || !ST.fac || !ST.fac.length) return;
+    var codes = {}, brands = {};
+    ST.fac.forEach(function(f){
+      if (f[0] === "m") codes[f[5] || "M"] = 1;
+      else if (f[0] === "f") brands[f[5] || "other"] = 1;
+    });
+    Object.keys(codes).forEach(function(c){
+      if (!map.hasImage("ex-" + c)) map.addImage("ex-" + c, exitIconImg(c), {pixelRatio:2});
+    });
+    Object.keys(brands).forEach(function(b){
+      if (!map.hasImage("fu-" + b)) map.addImage("fu-" + b, brandIconImg(b), {pixelRatio:2});
     });
   }
 
@@ -1557,16 +1620,20 @@ setInterval(loadRadar, 720000);
     });
 
     addFacIcons(map);
+    addFacDynIcons(map);
     map.addSource("fac", {type:"geojson", data: facilitiesFC()});
-    /* 每類一個 layer，可有各自嘅最低 zoom（廁所最密，要 zoom 14 才畫） */
-    [["t",14],["m",13],["f",13],["h",11]].forEach(function(cfg){
-      var k = cfg[0];
+    /* 每類一個 layer：可有各自最低 zoom 同圖示（廁所最密，zoom 14 才畫） */
+    [["t",14,"fac-t",[.42,.62,.86]],
+     ["m",13,["concat","ex-",["get","r"]],[.58,.8,1.0]],
+     ["f",13,["concat","fu-",["get","r"]],[.42,.58,.78]],
+     ["h",11,"fac-h",[.42,.62,.86]]].forEach(function(c){
+      var k = c[0], sz = c[3];
       map.addLayer({
-        id:"fac-" + k, type:"symbol", source:"fac", minzoom:cfg[1], filter:["==",["get","ty"],k],
+        id:"fac-" + k, type:"symbol", source:"fac", minzoom:c[1], filter:["==",["get","ty"],k],
         layout:{
           "visibility":"none",
-          "icon-image":"fac-" + k,
-          "icon-size":["interpolate",["linear"],["zoom"],12,.42,15,.62,18,.86],
+          "icon-image":c[2],
+          "icon-size":["interpolate",["linear"],["zoom"],12,sz[0],15,sz[1],18,sz[2]],
           "icon-allow-overlap":true, "icon-ignore-placement":true, "icon-padding":1
         }
       });
@@ -1596,7 +1663,7 @@ setInterval(loadRadar, 720000);
     if (ST.cafes.length) map.getSource("cafes").setData(cafesFC());
     if (ST.trails.length) map.getSource("trails").setData(trailsFC());
     if (ST.posts.length) map.getSource("posts").setData(postsFC());
-    if (ST.fac.length) map.getSource("fac").setData(facilitiesFC());
+    if (ST.fac.length) { addFacDynIcons(map); map.getSource("fac").setData(facilitiesFC()); }
     applyToggles();
   }
 
@@ -1627,7 +1694,7 @@ setInterval(loadRadar, 720000);
   function facilitiesFC(){
     return {type:"FeatureCollection", features:(ST.fac||[]).map(function(f){
       return {type:"Feature", geometry:{type:"Point", coordinates:[f[3], f[2]]},
-        properties:{ty:f[0], n:f[1], x:f[4]||""}};
+        properties:{ty:f[0], n:f[1], x:f[4]||"", r:f[5]||""}};
     })};
   }
   function trailsFC(){
@@ -2065,11 +2132,20 @@ setInterval(loadRadar, 720000);
   }
 
   var FACN = {t:"公共廁所", m:"地鐵站出入口", f:"油站", h:"醫院"};
+  var BRNAME = {shell:"Shell（蜆殼）", esso:"Esso（埃索）", caltex:"Caltex（加德士）",
+                sinopec:"Sinopec（中石化）", petrochina:"中石油", cnooc:"中海油", other:""};
   function facPopup(e){
     var q = e.features[0].properties, lnglat = e.features[0].geometry.coordinates;
+    var title = q.n, sub = FACN[q.ty] || "", extra = q.x || "";
+    if (q.ty === "m" && q.r && (!q.n || q.n === q.r)) title = "出口 " + q.r;
+    if (q.ty === "f"){
+      if (q.r && q.r !== "other"){ title = BRNAME[q.r] || q.n || "油站"; extra = ""; }
+      else if (!q.n || q.n === "油站") title = "油站";
+    }
+    if (extra && extra.toLowerCase() === String(title || "").toLowerCase()) extra = "";
     new maplibregl.Popup({maxWidth:"250px"}).setLngLat(lnglat)
-      .setHTML('<div class="pp"><h4>'+esc(q.n || FACN[q.ty] || "設施")+'</h4>'
-        + '<div class="sub">'+esc(FACN[q.ty] || "")+(q.x ? " · "+esc(q.x) : "")+'</div>'
+      .setHTML('<div class="pp"><h4>'+esc(title || FACN[q.ty] || "設施")+'</h4>'
+        + '<div class="sub">'+esc(sub)+(extra ? " · "+esc(extra) : "")+'</div>'
         + '<div class="row"><span>資料</span><span>OpenStreetMap</span></div>'
         + actBtns(null, lnglat[1], lnglat[0]) + '</div>').addTo(ST.map);
   }

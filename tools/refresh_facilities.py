@@ -94,6 +94,38 @@ def name_of(tags, ty):
     return LABEL[ty]
 
 
+def brand_key(tags):
+    """油站品牌正規化（OSM 中英混寫好亂）。"""
+    raw = " ".join(str(tags.get(k) or "") for k in ("brand", "operator", "brand:zh", "brand:en")).lower()
+    if "shell" in raw or "蜆殼" in raw or "蚬壳" in raw:
+        return "shell"
+    if "esso" in raw or "埃索" in raw:
+        return "esso"
+    if "caltex" in raw or "加德士" in raw:
+        return "caltex"
+    if "sinopec" in raw or "中石化" in raw or "中國石化" in raw or "中国石化" in raw:
+        return "sinopec"
+    if "petrochina" in raw or "中石油" in raw or "中國石油" in raw or "中国石油" in raw:
+        return "petrochina"
+    if "cnooc" in raw or "中海油" in raw or "中国海油" in raw or "中國海油" in raw:
+        return "cnooc"
+    return "other"
+
+
+def exit_code(tags):
+    ref = str(tags.get("ref") or "").strip()
+    ref = re.sub(r"出口|EXIT|Exit", "", ref).strip().upper()
+    return re.sub(r"[^A-Z0-9]", "", ref)[:3]
+
+
+def code_of(tags, ty):
+    if ty == "m":
+        return exit_code(tags) or "M"
+    if ty == "f":
+        return brand_key(tags)
+    return ""
+
+
 def extra_of(tags, ty):
     if ty == "m":
         p = []
@@ -134,7 +166,8 @@ def main():
                 continue
             seen.add(dk)
             keep += 1
-            items.append([ty, nm, round(float(lat), 6), round(float(lon), 6), extra_of(tags, ty)])
+            items.append([ty, nm, round(float(lat), 6), round(float(lon), 6),
+                          extra_of(tags, ty), code_of(tags, ty)])
         stats[ty] = keep
 
     items.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
