@@ -1113,7 +1113,7 @@ setInterval(loadRadar, 720000);
 
     <h3 class="wn-h">① 即時天氣與雷達</h3>
     <ul class="wn-list">
-      <li>開 App 第一頁就係香港天文台最新天氣、警告同雷達圖，落雨前一眼睇到。</li>
+      <li>開 App 預設落「地圖」；撳頂部「即時」tab 就見香港天文台最新天氣、警告同雷達圖，落雨前一眼睇到。</li>
       <li>同停車場／咪錶共用同一個刷新節奏，時間戳一律顯示香港時間。</li>
     </ul>
 
@@ -1147,6 +1147,7 @@ setInterval(loadRadar, 720000);
       <li>每張 Cafe 卡自動顯示兩個 badge：<b>🅿 最近停車場</b>（名＋距離）、<b>⏱ 200 米內咪錶</b>（數量＋最近距離＋現時有位數）。</li>
       <li>兩個獨立 toggle：<b>「🅿 200 米內停車場」</b>、<b>「⏱ 200 米內咪錶」</b>。兩個同開＝有停車場<b>或</b>有咪錶；只開一個＝必須有該項。</li>
       <li>搵咖啡店前先睇泊車，唔使兜冤枉路。</li>
+      <li><b>資料來源</b>：店名、地址、電話、營業時間、簡介嚟自 <b>Quality Life Coffee 咖啡店目錄（cafe.qualitylife.coffee）</b>，本 App 只轉載並加上泊車資訊，內容以店家最新公布為準。</li>
     </ul>
 
     <h3 class="wn-h">⑥ 山徑 · 167 段＋標距柱</h3>
@@ -1166,7 +1167,30 @@ setInterval(loadRadar, 720000);
       <li>手機瀏覽器「加到主畫面」即變成 App 圖示，有針 P icon、開得快、有背景更新。</li>
     </ul>
 
+    <h3 class="wn-h">⑨ 資料來源（Credit）</h3>
+    <ul class="wn-list">
+      <li><b>天氣、雷達、雨量</b>：香港天文台 Hong Kong Observatory（hko.gov.hk）。</li>
+      <li><b>公眾假期</b>：香港特別行政區政府（1823／data.gov.hk）。</li>
+      <li><b>停車場即時空位、收費原文、路邊咪錶</b>：運輸署「香港出行易」DRSS（hkemobility.gov.hk）及 data.gov.hk。</li>
+      <li><b>停車場收費補充</b>：領展 LinkHK（linkhk.com）、越秀商場停車場（yuexiuaptparking.com）、港鐵（mtr.com.hk）、香港機場管理局（hongkongairport.com），以及用戶回報。</li>
+      <li><b>Cafe</b>：Quality Life Coffee 咖啡店目錄（cafe.qualitylife.coffee）——店名、地址、電話、營業時間、簡介由該站整理。</li>
+      <li><b>山徑、標距柱</b>：漁農自然護理署遠足徑資料（hiking.gov.hk）。</li>
+      <li><b>地圖底圖</b>：© OpenStreetMap contributors。</li>
+      <li>以上資料版權屬各自機構／作者所有，本 App 只作免費轉載參考；如機構想更正或要求下架，通知我們即時處理。</li>
+    </ul>
+
     <h3 class="wn-h">更新紀錄</h3>
+    <div class="wn-day"><span class="d">2026-11-24</span><span class="t">版面與使用流程 <span class="wn-tag">版面</span></span></div>
+    <ul class="wn-list">
+      <li>一開 App 直接落<b>地圖</b>，唔使再撳 tab 或等即時頁。</li>
+      <li>唔會再自動彈「路邊感應咪錶」；想睇就自己撳。</li>
+      <li>左下圖層面板加「▾ 收起」，收起後只剩「☰ 圖層」；手機改 <b>4×2 八格</b>，label 縮短（山徑 167／咪錶 17,635／Cafe 446）。</li>
+      <li><b>遠足徑同標距柱合併成一個掣</b>，一撳同時開山徑線同標距柱。</li>
+      <li>頂部 4 格（總空位／有空位車場／私家車位／更新時間）由兩行改<b>一行四格</b>。</li>
+      <li>手機加「ⓘ 功能說明」入口，唔再靠被隱藏嘅圖例。</li>
+      <li>每項外來資料加返來源 credit（見上面 ⑨）。</li>
+    </ul>
+
     <div class="wn-day"><span class="d">2026-11-24</span><span class="t">收費解析全面校正 <span class="wn-tag">最新</span></span></div>
     <ul class="wn-list">
       <li>康怡廣場由「$18/小時」修正為 <b>$27/小時</b>（原文：首半小時 $18／每小時 $27）。</li>
@@ -1204,7 +1228,7 @@ setInterval(loadRadar, 720000);
     </ul>
 
     <button type="button" class="wn-more" id="open-about2">資料來源與免責聲明 ›</button>
-    <p class="about-sub">資料來源：香港出行易 DRSS、運輸署、領展、越秀、港鐵、機管局、漁護署、香港天文台、用戶回報。詳見「資料來源與免責聲明」。</p>
+    <p class="about-sub">資料來源：香港天文台、香港出行易 DRSS／運輸署、data.gov.hk、領展、越秀商場停車場、港鐵、機管局、漁護署、Quality Life Coffee 咖啡店目錄、OpenStreetMap contributors、用戶回報。詳見「資料來源與免責聲明」。</p>
   </div>
 </section>
 <script src="https://fastly.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
