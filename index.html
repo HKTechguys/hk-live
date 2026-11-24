@@ -211,6 +211,14 @@ body.sheet-on .hk-install{display:none}
 .pk-tools button.pk-list{color:var(--ink);border-color:rgba(255,255,255,.22)}
 .pk-tools button.pk-list::before{display:none}
 .pk-tools button.pk-list::after{content:"▸";color:var(--dim);font-size:10px}
+/* 頂部收起掣：一行細字，唔佔位 */
+.pk-tools .pk-fold{flex:0 0 100%;grid-column:1/-1;justify-content:center;font-size:10px;letter-spacing:.6px;
+  color:var(--dim);background:none;border:0;padding:0;margin:-1px 0 1px;min-height:14px}
+.pk-tools .pk-fold::before,.pk-tools .pk-fold::after{display:none}
+.pk-tools .pk-fold:hover{color:var(--ink)}
+.pk-tools.folded{padding:2px 4px;gap:0;right:auto;width:-moz-fit-content;width:fit-content;max-width:none}
+.pk-tools.folded .pk-fold{flex:0 0 auto;grid-column:auto;font-size:11px;color:var(--ink);padding:4px 10px;min-height:0}
+.pk-tools.folded > *:not(.pk-fold){display:none}
 /* Cafe 用咖啡杯取代圓點（同地圖標記同一形狀） */
 .pk-tools button#tg-cafes::before,.pk-tools button#tg-cafes[aria-pressed="true"]::before{
   content:"";width:13px;height:13px;border-radius:0;background:var(--dim);flex:none;
@@ -964,12 +972,12 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-tools" id="layer-tools">
+    <button id="pk-fold" class="pk-fold" aria-expanded="true" aria-controls="layer-tools">▾ 收起</button>
     <div class="pk-watch" id="pk-watch" hidden></div>
     <button id="tg-parks" aria-pressed="true">停車場</button>
     <button id="tg-meters" aria-pressed="true">感應咪錶</button>
     <button id="tg-cafes" aria-pressed="false">Cafe</button>
-    <button id="tg-trails" aria-pressed="false">遠足徑</button>
-    <button id="tg-posts" aria-pressed="false">標距柱</button>
+    <button id="tg-trails" aria-pressed="false">遠足徑＋標距柱</button>
     <button id="tg-free" aria-pressed="false">只看有空位</button>
     <button id="open-trail" class="pk-list">山徑 167 段</button>
     <button id="open-meter" class="pk-list">咪錶 20,735 位</button>
@@ -1298,6 +1306,22 @@ setInterval(loadRadar, 720000);
   TABS.forEach(function(t){
     document.getElementById(t[0]).addEventListener("click", function(){ showTab(t[0]); });
   });
+
+  /* ---------- 圖層面板：頂部細字掣可收起 ---------- */
+  function foldTools(f){
+    var lt = document.getElementById("layer-tools"), fb = document.getElementById("pk-fold");
+    if (!lt || !fb) return;
+    lt.classList.toggle("folded", f);
+    fb.setAttribute("aria-expanded", f ? "false" : "true");
+    fb.textContent = f ? "☰ 圖層" : "▾ 收起";
+    if (typeof placeInstall === "function") placeInstall();
+  }
+  (function(){
+    var fb = document.getElementById("pk-fold");
+    if (fb) fb.addEventListener("click", function(){
+      foldTools(!document.getElementById("layer-tools").classList.contains("folded"));
+    });
+  })();
 
   /* ---------- sheets ---------- */
   function anySheetOn(){
@@ -1962,7 +1986,7 @@ setInterval(loadRadar, 720000);
     if (map.getLayer("meter-dot") && MI) map.setFilter("meter-dot", meterFilter());
   }
   [["tg-parks","parks"],["tg-meters","meters"],["tg-cafes","cafes"],
-   ["tg-trails","trails"],["tg-posts","posts"],["tg-free","free"]].forEach(function(pair){
+   ["tg-free","free"]].forEach(function(pair){
     var b = document.getElementById(pair[0]);
     b.setAttribute("aria-pressed", TG[pair[1]]);
     b.addEventListener("click", function(){
@@ -1971,6 +1995,16 @@ setInterval(loadRadar, 720000);
       applyToggles();
     });
   });
+  /* 遠足徑同標距柱合做一個掣 */
+  (function(){
+    var b = document.getElementById("tg-trails");
+    b.setAttribute("aria-pressed", TG.trails);
+    b.addEventListener("click", function(){
+      TG.trails = !TG.trails; TG.posts = TG.trails;
+      b.setAttribute("aria-pressed", TG.trails);
+      applyToggles();
+    });
+  })();
 
   /* ---------- search ---------- */
   function wireSearch(){
@@ -1999,7 +2033,7 @@ setInterval(loadRadar, 720000);
         if (((t.n+" "+t.e+" "+(t.ty||"")+" "+(t.rg||"")+" "+(t.sp||"")+" "+(t.ep||"")+" "+(t.lv||""))||"")
             .toLowerCase().indexOf(v) >= 0)
           hits.push({t:t.n, s:"山徑 · "+t.lv+" · "+t.len+" km", bounds:t.lines, z:14,
-                     on:function(){ TG.trails = true; setBtn("tg-trails", true); }});
+                     on:function(){ TG.trails = true; TG.posts = true; setBtn("tg-trails", true); }});
       });
       if (!hits.length){ box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>'; return; }
       hits.slice(0,8).forEach(function(h){
@@ -2090,7 +2124,7 @@ setInterval(loadRadar, 720000);
     Array.prototype.forEach.call(list.querySelectorAll("button[data-fly]"), function(b){
       b.addEventListener("click", function(){
         var i = Number(b.getAttribute("data-fly"));
-        TG.trails = true; setBtn("tg-trails", true);
+        TG.trails = true; TG.posts = true; setBtn("tg-trails", true);
         if (ST.map) ST.map.resize();
         applyToggles();
         closeSheet("p-trail");
@@ -2889,7 +2923,7 @@ setInterval(loadRadar, 720000);
     if (base === "now") { showTab("tab-now"); return; }
     showTab("tab-map");
     if (base === "cafe") { TG.cafes = true; setBtn("tg-cafes", true); closeSheet("p-trail"); closeSheet("p-meter"); openSheet("p-cafe"); }
-    else if (base === "trail" || base === "trails") { TG.trails = true; setBtn("tg-trails", true); closeSheet("p-cafe"); closeSheet("p-meter"); openSheet("p-trail"); }
+    else if (base === "trail" || base === "trails") { TG.trails = true; TG.posts = true; setBtn("tg-trails", true); closeSheet("p-cafe"); closeSheet("p-meter"); openSheet("p-trail"); }
     else if (base === "meter") { TG.meters = true; setBtn("tg-meters", true); closeSheet("p-cafe"); closeSheet("p-trail"); openSheet("p-meter"); if (typeof renderMeters === "function") renderMeters(); }
     else if (base === "park") { TG.parks = true; setBtn("tg-parks", true); closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
     else { closeSheet("p-cafe"); closeSheet("p-trail"); closeSheet("p-meter"); }
@@ -2976,6 +3010,7 @@ setInterval(loadRadar, 720000);
     pushLabel();
   }
 })();
+
 
 </script>
 
