@@ -161,6 +161,7 @@ for r in spaces:
         sid, la, lo, occ.get(sid, -1),
         (r.get("Street_tc") or "").strip(),
         (r.get("District_tc") or "").strip(),
+        (r.get("VehicleType") or "").strip(),  # A=私家車 G=貨車 C=旅遊巴（前端靠呢個過濾）
     ])
 
 with open(os.path.join(OUT, "meters.json"), "w", encoding="utf-8") as fh:
