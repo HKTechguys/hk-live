@@ -1226,6 +1226,8 @@ setInterval(loadRadar, 720000);
       <li><b>地鐵出口改寫出口編號</b>（A1／B2／D1…，冇編號才顯示 M），popup 顯示所屬站名（旺角站、旺角東站、太子站…）。</li>
       <li><b>油站改用品牌色徽章</b>：Shell／Esso／Caltex／Sinopec／中石油，popup 顯示中文品牌名。</li>
       <li>搜尋用免費 OSM 地理編碼（Photon），只查香港範圍，350ms 防手震＋同一字快取。</li>
+      <li><b>非運輸署場都有即時空位</b>：1,654 場入面 1,090 個唔在運輸署名單（領展／港鐵／商場場等），照樣由出行易取讀數（例：屯門市廣場一期 4 位、三期 26 位）；靜態資料亦改為同一全量，全港唔會再只剩 564 場。</li>
+      <li><b>Worker 加 8 秒 timeout</b>：出行易慢或掛時唔會卡住 HUD，即用靜態數據並 20 秒後自動重試；咪錶資料補返車輛種類（私家車位剩餘數字回復正常）。</li>
     </ul>
 
     <div class="wn-day"><span class="d">2026-11-24</span><span class="t">版面與使用流程 <span class="wn-tag">版面</span></span></div>
