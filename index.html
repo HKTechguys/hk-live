@@ -983,7 +983,7 @@ setInterval(loadRadar, 720000);
   </div>
 
   <div class="pk-search">
-    <input id="q" type="search" aria-label="搜尋車場、街道或 Cafe" placeholder="車場／街道／Cafe／山徑，例如 中環">
+    <input id="q" type="search" aria-label="搜尋任何地點、大廈、車場" placeholder="任何地點／大廈／商場 · 例如 旺角中心">
     <div class="pk-results" id="results"></div>
   </div>
 
@@ -1223,6 +1223,7 @@ setInterval(loadRadar, 720000);
       <li>每項外來資料加返來源 credit（見上面 ⑩）。</li>
       <li><b>Cafe 名單改為每日 09:00 自動更新</b>（該站官方 API；新店自動加入、結業自動移除）。</li>
       <li><b>新增每日 10:30 健康檢查</b>：Worker 即時數據、運輸署咪錶來源、線上網站、各份 data 新鮮度；壞咗 GitHub 會發失敗通知。</li>
+      <li><b>搜尋框變成「任何地名」</b>：除原有車場／Cafe／咪錶／山徑，打大廈、商場、街道名（如「旺角中心」「皇廷廣場」）會經 OpenStreetMap 即時查坐标，飛去並落一個藍針；本地資料照舊優先。</li>
       <li><b>新增「設施」圖層</b>：圖層面板加一條全寬「▸ 設施」組頭，展開 4 個子開關（廁所／地鐵出口／油站／醫院），資料來自 OpenStreetMap，每週自動更新；地鐵出口徽章改寫<b>出口編號</b>（A1／D2…）並在 popup 顯示<b>站名</b>，油站改<b>品牌色徽章</b>（Shell／Esso／Caltex／Sinopec／中石油）。</li>
     </ul>
 
@@ -2260,10 +2261,33 @@ setInterval(loadRadar, 720000);
   function wireSearch(){
     var q = document.getElementById("q");
     var box = document.getElementById("results");
-    q.addEventListener("input", function(){
-      var v = q.value.trim().toLowerCase();
-      box.innerHTML = "";
-      if (!v) return;
+    var seq = 0, cache = {};
+
+    var pin = null;
+    function pinAt(lo, la, label){
+      if (pin) { try{ pin.remove(); }catch(e){} }
+      pin = new maplibregl.Marker({color:"#22d3ee"}).setLngLat([lo, la])
+        .setPopup(new maplibregl.Popup({offset:18, maxWidth:"220px"})
+          .setHTML('<div class="pp"><h4>'+esc(label)+'</h4></div>'))
+        .addTo(ST.map);
+      pin.togglePopup();
+    }
+    function addHit(h){
+      var el = document.createElement("div");
+      el.className = "pk-hit";
+      el.innerHTML = "<b>"+esc(h.t)+"</b><span>"+esc(h.s)+"</span>";
+      el.addEventListener("click", function(){
+        if (!ST.map) return;
+        if (h.on) { h.on(); applyToggles(); }
+        if (h.bounds) flyToTrail(h.bounds);
+        else ST.map.flyTo({center:[h.lo,h.la], zoom:h.z, duration:900});
+        if (h.pin) pinAt(h.lo, h.la, h.t);
+        box.innerHTML = ""; q.blur();
+      });
+      box.appendChild(el);
+    }
+
+    function localHits(v){
       var hits = [];
       ST.parks.forEach(function(p){
         if (((p.n+" "+p.e+" "+p.d+" "+p.a)||"").toLowerCase().indexOf(v) >= 0)
@@ -2285,21 +2309,73 @@ setInterval(loadRadar, 720000);
           hits.push({t:t.n, s:"山徑 · "+t.lv+" · "+t.len+" km", bounds:t.lines, z:14,
                      on:function(){ TG.trails = true; TG.posts = true; setBtn("tg-trails", true); }});
       });
-      if (!hits.length){ box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>'; return; }
-      hits.slice(0,8).forEach(function(h){
-        var el = document.createElement("div");
-        el.className = "pk-hit";
-        el.innerHTML = "<b>"+esc(h.t)+"</b><span>"+esc(h.s)+"</span>";
-        el.addEventListener("click", function(){
-          if (!ST.map) return;
-          if (h.on) { h.on(); applyToggles(); }
-          if (h.bounds) flyToTrail(h.bounds);
-          else ST.map.flyTo({center:[h.lo,h.la], zoom:h.z, duration:900});
+      return hits;
+    }
+
+    /* 任何地名／大廈／商場／街道：OSM Photon 地理編碼（開放 CORS，瀏覽器直連） */
+    function geoHits(v, cb){
+      if (cache[v]) return cb(cache[v]);
+      var c = ST.map ? ST.map.getCenter() : {lng:114.17, lat:22.32};
+      var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q.value.trim())
+        + "&limit=6&lang=default&lat=" + c.lat.toFixed(4) + "&lon=" + c.lng.toFixed(4)
+        + "&bbox=113.82,22.13,114.45,22.57";
+      var ctrl = window.AbortController ? new AbortController() : null, timer = null;
+      if (ctrl) timer = setTimeout(function(){ try{ ctrl.abort(); }catch(e){} }, 7000);
+      fetch(url, ctrl ? {signal: ctrl.signal} : undefined).then(function(r){ return r.json(); }).then(function(d){
+        if (timer) clearTimeout(timer);
+        var out = [], seenN = {};
+        (d.features || []).forEach(function(f){
+          var p = f.properties || {}, co = f.geometry && f.geometry.coordinates;
+          if (!co) return;
+          var nm = p.name || p.street || "";
+          if (!nm) return;
+          var hn = p.housenumber && p.housenumber !== "None" ? " " + p.housenumber : "";
+          var line = [((p.street || "") + hn).trim(), p.district || p.city || ""].filter(Boolean).join(" · ");
+          var key = p.osm_key || "";
+          var z = /building|shop|amenity|tourism|office|leisure/.test(key) ? 17
+                  : (/landuse|highway|place/.test(key) ? 16 : 14);
+          var dk = nm.toLowerCase();
+          if (seenN[dk]) return;
+          seenN[dk] = 1;
+          out.push({t:nm, s:"地名" + (line ? " · " + line : ""), la:co[1], lo:co[0], z:z, pin:true});
         });
-        box.appendChild(el);
-      });
+        cache[v] = out;
+        cb(out);
+      }).catch(function(){ if (timer) clearTimeout(timer); cb([]); });
+    }
+
+    q.addEventListener("input", function(){
+      var v = q.value.trim().toLowerCase();
+      box.innerHTML = "";
+      seq++;
+      if (!v) return;
+      var lh = localHits(v);
+      lh.slice(0,5).forEach(addHit);
+      if (v.length < 2){
+        if (!lh.length) box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>';
+        return;
+      }
+      var my = seq, hint = document.createElement("div");
+      hint.className = "pk-hit";
+      hint.innerHTML = '<span>搵緊地點…</span>';
+      if (!lh.length) box.appendChild(hint);
+      setTimeout(function(){
+        geoHits(v, function(rs){
+          if (my !== seq) return;
+          if (hint.parentNode) hint.parentNode.removeChild(hint);
+          var names = {};
+          lh.forEach(function(h){ names[String(h.t).toLowerCase()] = 1; });
+          var extra = rs.filter(function(h){ return !names[String(h.t).toLowerCase()]; });
+          if (!extra.length){
+            if (!lh.length) box.innerHTML = '<div class="pk-hit"><span>冇匹配結果</span></div>';
+            return;
+          }
+          extra.slice(0,6).forEach(addHit);
+        });
+      }, 350);
     });
   }
+
   function setBtn(id, on){
     var b = document.getElementById(id);
     if (b) b.setAttribute("aria-pressed", on);
