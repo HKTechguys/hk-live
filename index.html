@@ -2390,7 +2390,6 @@ setInterval(loadRadar, 720000);
       }, 350);
     });
   }
-
   function setBtn(id, on){
     var b = document.getElementById(id);
     if (b) b.setAttribute("aria-pressed", on);
@@ -3108,7 +3107,11 @@ setInterval(loadRadar, 720000);
     if (!PUSH.api) return Promise.resolve(false);
     if (PKL.busy) return Promise.resolve(null);
     PKL.busy = true;
-    return fetch(PUSH.api + "/parks" + (force ? "?t=" + Date.now() : "")).then(function(r){ return r.json(); }).then(function(d){
+    /* 8 秒 timeout：Worker cold 要即時問出行易，慢就放棄，用住靜態數據再 20 秒重試 */
+    var PKAB = ("AbortController" in window) ? new AbortController() : null;
+    var PKTO = setTimeout(function(){ if (PKAB) { try { PKAB.abort(); } catch(e){} } }, 8000);
+    return fetch(PUSH.api + "/parks" + (force ? "?t=" + Date.now() : ""), PKAB ? {signal: PKAB.signal} : undefined).then(function(r){ return r.json(); }).then(function(d){
+      clearTimeout(PKTO);
       PKL.busy = false;
       if (!d || !d.rows || !d.rows.length) { pkRetry(); return false; }
       if (PKL.t) { clearTimeout(PKL.t); PKL.t = null; }
@@ -3141,7 +3144,7 @@ setInterval(loadRadar, 720000);
       if (stt) stt.textContent = new Date(PKL.at).toLocaleTimeString("zh-HK", {hour12:false});
       if (tb) tb.textContent = "停車場 " + ST.parks.length.toLocaleString();
       return true;
-    }).catch(function(){ PKL.busy = false; pkRetry(); return false; });
+    }).catch(function(){ clearTimeout(PKTO); PKL.busy = false; pkRetry(); return false; });
   }
 
   /* 手動更新：一次過重拉出行易停車場 + 運輸署咪錶（地圖左上 ↻） */

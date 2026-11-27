@@ -9,6 +9,7 @@ import csv
 import io
 import json
 import os
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -17,6 +18,8 @@ OUT = os.path.join(ROOT, "data")
 os.makedirs(OUT, exist_ok=True)
 
 BASE = "https://resource.data.one.gov.hk/td"
+# 出行易全量（1,654 場，含非運輸署場）由自家 Worker 代抓（Worker 有 CORS＋120 秒快取）
+WORKER = "https://hk-live-push.hklive.workers.dev/parks"
 URLS = {
     "vacancy_all.json": BASE + "/carpark/vacancy_all.json",
     "basic_info_all.json": BASE + "/carpark/basic_info_all.json",
@@ -46,39 +49,10 @@ def hk_now():
     return datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
 
 
-TS_FMTS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y %I:%M:%S %p",
-           "%m/%d/%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S")
-
-
-def ts_parse(s):
-    """運輸署時間字串有兩種格式：vacancy_all.json 用 ISO，occupancystatus.csv 用
-    m/d/Y + 12 小時制。直接字串比較會揀到「12/29/2025」呢類假最大值，所以一律 parse。"""
-    s = (s or "").strip()
-    if not s:
-        return None
-    for f in TS_FMTS:
-        try:
-            return datetime.strptime(s, f)
-        except ValueError:
-            pass
-    return None
-
-
-def ts_max(cur, s):
-    d = ts_parse(s)
-    if d is None:
-        return cur
-    return d if cur is None or d > cur else cur
-
-
-def ts_out(d):
-    return d.strftime("%Y-%m-%d %H:%M:%S") if d else ""
-
-
 basic = {p["park_id"]: p for p in load_json("basic_info_all.json")["car_park"]}
 vac = load_json("vacancy_all.json")["car_park"]
 
-parks, latest = [], None
+parks, latest = [], ""
 for item in vac:
     pid = item.get("park_id")
     base = basic.get(pid)
@@ -94,7 +68,8 @@ for item in vac:
             elif vt.get("type") == "P_D":
                 pcd += int(sc.get("vacancy") or 0)
             ts = sc.get("lastupdate") or ""
-            latest = ts_max(latest, ts)
+            if ts > latest:
+                latest = ts
     lat, lng = base.get("latitude"), base.get("longitude")
     if not lat or not lng:
         continue
@@ -111,24 +86,66 @@ for item in vac:
         "h": base.get("height") or 0,
     })
 
+def worker_rows():
+    """出行易全量（經自家 Worker）：非運輸署場（領展／港鐵／商場場等）靠呢個補齊。"""
+    req = urllib.request.Request(
+        WORKER + "?t=%d" % int(time.time()),
+        headers={"User-Agent": "hk-live-parking/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return (json.loads(r.read().decode("utf-8")).get("rows") or [])
+
+
+# 用出行易全量併入（TD 冇讀數就沿用 TD；非 TD 場新增，v=-1 表示冇實時讀數）
+byid = {p["id"]: p for p in parks}
+added, patched = 0, 0
+try:
+    for row in worker_rows():
+        pid, v = row[0], row[5]
+        if pid in byid:
+            if v >= 0 and byid[pid]["v"] != int(v):
+                byid[pid]["v"] = int(v)
+                patched += 1
+            continue
+        if not row[3] or not row[4]:
+            continue
+        parks.append({
+            "id": pid,
+            "n": row[1] or pid,
+            "e": "",
+            "a": row[2] or "",
+            "d": row[6] or "",
+            "la": round(float(row[3]), 5),
+            "lo": round(float(row[4]), 5),
+            "v": int(v) if isinstance(v, (int, float)) else -1,
+            "vd": 0,
+            "h": row[7] or 0,
+        })
+        added += 1
+except Exception as e:  # Worker 掛／出行易死 → 保留運輸署 564 場，唔會寫空
+    print("worker merge skipped:", e)
+print("worker merge: +%d new, %d vacancy patched" % (added, patched))
+
 parks.sort(key=lambda p: -p["v"])
 with open(os.path.join(OUT, "parking.json"), "w", encoding="utf-8") as fh:
     json.dump({
         "generated": hk_now(),
         "source": "運輸署 實時停車場空位 (vacancy_all.json / basic_info_all.json)",
-        "last_update": ts_out(latest),
+        "last_update": latest,
         "count": len(parks),
         "parks": parks,
     }, fh, ensure_ascii=False, separators=(",", ":"))
 
 spaces = read_csv("parkingspaces.csv")
-occ, occ_time = {}, None
+occ, occ_time = {}, ""
 for r in read_csv("occupancystatus.csv", skip=0):
     sid = r.get("ParkingSpaceId")
     if not sid:
         continue
     occ[sid] = 1 if (r.get("OccupancyStatus") or "").strip().upper() == "O" else 0
-    occ_time = ts_max(occ_time, r.get("OccupancyDateChanged") or "")
+    ts = r.get("OccupancyDateChanged") or ""
+    if ts > occ_time:
+        occ_time = ts
 
 meters = []
 for r in spaces:
@@ -144,19 +161,18 @@ for r in spaces:
         sid, la, lo, occ.get(sid, -1),
         (r.get("Street_tc") or "").strip(),
         (r.get("District_tc") or "").strip(),
-        (r.get("VehicleType") or "").strip().upper(),   # A 任何車輛 / G 貨車 / C 旅遊巴
     ])
 
 with open(os.path.join(OUT, "meters.json"), "w", encoding="utf-8") as fh:
     json.dump({
         "generated": hk_now(),
         "source": "運輸署 路邊泊車位位置 + 佔用狀態",
-        "last_update": ts_out(occ_time),
+        "last_update": occ_time,
         "count": len(meters),
         "occupied": sum(1 for m in meters if m[3] == 1),
         "vacant": sum(1 for m in meters if m[3] == 0),
         "spaces": meters,
     }, fh, ensure_ascii=False, separators=(",", ":"))
 
-print("parks: %d (vacancy update %s)" % (len(parks), ts_out(latest)))
+print("parks: %d (vacancy update %s)" % (len(parks), latest))
 print("meters: %d (vacant %d)" % (len(meters), sum(1 for m in meters if m[3] == 0)))
