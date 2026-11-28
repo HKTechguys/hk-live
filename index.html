@@ -1119,7 +1119,7 @@ setInterval(loadRadar, 720000);
   <div class="inner">
     <p class="about-p">資料由政府公開資料提供,以停車場實際為準。本手機應用程式資料只供參考之用,並不保證所列資料的準確性及可靠性。</p>
     <p class="about-p">如你使用有關資料而引致任何損失,汽車台概不承擔任何責任。</p>
-    <p class="about-sub">資料來源：香港出行易（hkemobility.gov.hk）DRSS 停車場圖層、運輸署實時車位、領展／港鐵／機管局公布收費、用戶回報收費，以及漁護署山徑圖層。</p>
+    <p class="about-sub">資料來源：香港出行易（hkemobility.gov.hk）DRSS 停車場圖層、運輸署實時車位、領展／港鐵／信和公布收費、第三方參考價（標「非官方」）、用戶回報收費，以及漁護署山徑圖層。</p>
   </div>
 </section>
 
@@ -1147,9 +1147,9 @@ setInterval(loadRadar, 720000);
 
     <h3 class="wn-h">③ 停車場收費（多來源）</h3>
     <ul class="wn-list">
-      <li><b>來源</b>：香港出行易收費原文、領展 145 個場、越秀 55 個場、港鐵 6 個站場、機場 3 個場，加埋<b>用戶回報</b>。</li>
-      <li>營運商官網價優先於出行易原文，因為官網最準、最新。</li>
-      <li><b>按現時段自動切價</b>：而家係夜間時段就顯示「夜泊參考 $X/小時」，日間就顯示「時租參考」。</li>
+      <li><b>來源</b>：香港出行易收費原文、領展 145 個場、越秀 55 個場、港鐵 6 個站場、信和 6 個商場官網價、8 個場第三方參考價（標「非官方」），加埋<b>用戶回報</b>；結構化時租共 220 個場。</li>
+      <li>營運商官網價優先於出行易原文，因為官網最準、最新；官網冇公開時租嘅場，先用第三方參考價補位，並喺 popup 標明「非官方」。</li>
+      <li><b>按現時段自動切價</b>：夜間時段顯示「夜泊參考 $X/小時」；有全晚定額嘅場（黃金海岸 $88／晚）就直接顯示「夜泊參考 $88／晚」，日間照顯示「時租參考」。</li>
       <li><b>星期六日自動切價</b>：有六日價嘅場（164 個），逢星期六日顯示「六日參考 $X/小時」。</li>
       <li>半小時制會換算成每小時（例：$7/半小時 → $14/小時）；「首半小時 $18、每小時 $27」會取 $27，唔會當 $18。</li>
       <li>日泊／夜泊「套票價」（例如夜泊 $90 包一晚）<b>唔會</b>當成每小時，避免誤導。</li>
@@ -1211,7 +1211,7 @@ setInterval(loadRadar, 720000);
       <li><b>天氣、雷達、雨量</b>：香港天文台 Hong Kong Observatory（hko.gov.hk）。</li>
       <li><b>公眾假期</b>：香港特別行政區政府（1823／data.gov.hk）。</li>
       <li><b>停車場即時空位、收費原文、路邊咪錶</b>：運輸署「香港出行易」DRSS（hkemobility.gov.hk）及 data.gov.hk。</li>
-      <li><b>停車場收費補充</b>：領展 LinkHK（linkhk.com）、越秀商場停車場（yuexiuaptparking.com）、港鐵（mtr.com.hk）、香港機場管理局（hongkongairport.com），以及用戶回報。</li>
+      <li><b>停車場收費補充</b>：領展 LinkHK（linkhk.com）、越秀商場停車場（yuexiuaptparking.com）、港鐵（mtr.com.hk）、信和商場官網（tmtp.com.hk／citywalk.com.hk／goldcoastpiazza.com.hk）、第三方參考價（parkinglothk 等，popup 標「非官方」），以及用戶回報。</li>
       <li><b>Cafe</b>：Quality Life Coffee 咖啡店目錄（cafe.qualitylife.coffee）——店名、地址、電話、營業時間、簡介由該站整理。</li>
       <li><b>山徑、標距柱</b>：漁農自然護理署遠足徑資料（hiking.gov.hk）。</li>
       <li><b>地圖底圖</b>：© OpenStreetMap contributors。</li>
@@ -1220,10 +1220,12 @@ setInterval(loadRadar, 720000);
     </ul>
 
     <h3 class="wn-h">更新紀錄</h3>
-    <div class="wn-day"><span class="d">2026-11-28</span><span class="t">信和商場時租 <span class="wn-tag">最新</span></span></div>
+    <div class="wn-day"><span class="d">2026-11-28</span><span class="t">信和時租 · 夜泊 · 非官方參考 <span class="wn-tag">最新</span></span></div>
     <ul class="wn-list">
       <li><b>信和 6 個場加官網時租</b>：屯門市廣場一期 $19／假 $27、二期 $27（貨車 $30）、三期 $17／假 $22；荃新天地及荃新天地2 $18／假 $25；黃金海岸商場 $13／半小時（一至四）、$16／半小時（五六日及公假）、夜泊 $88。popup 收費行標「· 信和」。</li>
       <li><b>每週一自動重抓官網</b>：直接讀三個商場官網時租表（屯門市廣場、荃新天地、黃金海岸）；官網改版抽唔到就保留舊價，唔會清空。</li>
+      <li><b>夜泊結構化、夜晚自動改價</b>：黃金海岸商場 20:00–翌日 08:00 為夜泊 $88／晚，popup 20:00 後自動由「時租」切做「夜泊參考 $88／晚」，日間照顯示半小時制。屯門一／二／三期官網只公佈日泊（三期 $95 平日、$113 六日），冇夜泊數字，所以唔硬套。</li>
+      <li><b>未公開時租嘅場加「第三方參考價」</b>：奧海城一／二／三期、中港城、藍灣半島、元朗廣場、信和廣場、帝國中心共 8 場，popup 顯示「約 $xx–xx／小時（第三方參考）」，來源標「· 非官方」；日後官網正式公佈時租會自動蓋過參考價。</li>
     </ul>
 
     <div class="wn-day"><span class="d">2026-11-27</span><span class="t">地圖搜尋 × 設施徽章</span></div>
