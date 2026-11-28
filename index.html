@@ -2038,7 +2038,7 @@ setInterval(loadRadar, 720000);
         + (Number(p.vd) > 0 ? '<div class="row"><span>傷健位空位</span><span>'+p.vd+'</span></div>' : "")
         + (Number(p.h) > 0 ? '<div class="row"><span>高度限制</span><span>'+p.h+' m</span></div>' : "")
         + (function(){ var fr = feeNow(p); return fr.v > 0
-          ? '<div class="row"><span>'+fr.lab+'參考</span><span class="big" style="color:#f6c85f">$'+fr.v+'/小時</span></div>' : ""; })()
+          ? '<div class="row"><span>'+fr.lab+'參考</span><span class="big" style="color:#f6c85f">$'+fr.v+(fr.u || "/小時")+'</span></div>' : ""; })()
         + (Number(p.uh) > 0 ? '<div class="row"><span>用戶回報</span><span style="color:#54d8c4">$'+p.uh+'/小時 <em style="font-style:normal;color:#8fa3ad">'+(p.ut||"")+'</em></span></div>' : "")
         + (p.f ? '<div class="fee">'+esc(p.f)+(p.fs ? ' <em>· '+esc(p.fs)+'</em>' : '')+'</div>' : "")
         + '<div class="ufee" data-pid="'+esc(p.id)+'"><button type="button" data-feebtn>💰 我知價錢</button>'
@@ -3064,7 +3064,10 @@ setInterval(loadRadar, 720000);
     var d = new Date(Date.now() + 8 * 3600000);
     var hr = d.getUTCHours(), dw = d.getUTCDay(), wk = (dw === 0 || dw === 6);
     var nh = Number(p.pnh) || 0, ne = Number(p.pne) || 0, hh = Number(p.phh) || 0;
+    var nt = Number(p.nt) || 0, ns = Number(p.ns) || 0, nte = Number(p.ne) || 0;
     var isNight = nh > 0 && (nh > ne ? (hr >= nh || hr < ne) : (hr >= nh && hr < ne));
+    var isNt = ns > 0 && (ns > nte ? (hr >= ns || hr < nte) : (hr >= ns && hr < nte));
+    if (isNt && nt > 0) return {v: nt, lab: "夜泊", u: "/晚"};   // 商場夜泊 = 全晚總額
     if (isNight && hh > 0) return {v: hh, lab: "夜泊"};
     if (wk && Number(p.fw) > 0) return {v: Number(p.fw), lab: "六日"};
     return {v: Number(p.fh) || 0, lab: "時租"};
@@ -3100,6 +3103,7 @@ setInterval(loadRadar, 720000);
       if (e.h && (off || !p.fh)){ p.fh = e.h; n++; }
       if (!p.fw && e.w){ p.fw = e.w; n++; }
       if (e.hh && (off || !p.phh)){ p.phh = e.hh; p.pnh = e.nh || 0; p.pne = e.ne || 0; n++; }
+      if (e.nt && !p.nt){ p.nt = e.nt; p.ns = e.ns || 0; p.ne = e.ne || 0; n++; }
     }
     if (n && ST.map){ var s = ST.map.getSource("parks"); if (s) s.setData(parksFC()); }
   }

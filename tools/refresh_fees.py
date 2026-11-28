@@ -163,6 +163,19 @@ SINO = {
 SINO_ID = {"tdc25p3": "tm1", "tdc25p43": "tm2", "tdc25p22": "tm3",
            "tdc25p29": "cw", "tdc25p30": "cw", "tdc25p23": "gc"}
 
+# 信和官網冇公開時租表嘅場：第三方查核價（範圍寫法，前端標「非官方」，唔會蓋官方文字）
+# 資料日 2026-11-28；來源 ParkingLotHK / kkleo / inpark / carparkhero
+SINO_REF = {
+    "tdc25p27": {"h": 19, "t": "時租約 $19–22／小時（第三方參考，非官方）"},
+    "tdc25p24": {"h": 18, "t": "時租約 $18–24／小時（第三方參考，非官方）"},
+    "tdc25p31": {"h": 21, "t": "時租約 $21–28／小時（第三方參考，非官方）"},
+    "tdc25p15": {"h": 28, "t": "時租約 $28–38／小時（第三方參考，非官方）；日泊 $200、夜泊 $90"},
+    "tdc25p25": {"h": 18, "t": "時租約 $18 起／小時（第三方參考，非官方）"},
+    "tdc16p259": {"h": 24, "t": "時租約 $24 起／小時（第三方參考，非官方）"},
+    "tdc25p2": {"h": 35, "t": "時租約 $35–37／小時（第三方參考，非官方）；日泊 $160"},
+    "tdc25p14": {"h": 35, "t": "時租約 $35–39／小時（第三方參考，非官方）"},
+}
+
 
 def sino_mall(name):
     n = name or ""
@@ -273,6 +286,8 @@ def sino_fees():
                     night = price
             e["t"] = ("時租 $%d／半小時（一至四）、$%d／半小時（五六日及公假）"
                       % (e["h"] // 2, e["hh"] // 2) + ("；夜泊 $%d" % night if night else ""))
+            if night:                       # 夜泊：全晚總額 20:00-08:00，前端夜晚自動切換
+                e["nt"], e["ns"], e["ne"] = night, 20, 8
             break
 
     for k, e in out.items():
@@ -478,12 +493,19 @@ def main():
         fees[k] = dict(sino[mall])
         sino_hit += 1
     print("sino mapped:", sino_hit)
+    # 官網冇明碼嘅信和場：第三方參考價（標非官方，唔蓋官方／出行易文字）
+    ref_hit = 0
+    for k, e in SINO_REF.items():
+        if k in sites and k not in fees:
+            fees[k] = dict(e, s="非官方", u="2026-11-28")
+            ref_hit += 1
+    print("sino ref (non-official):", ref_hit)
     # 官網今次抽唔到（改版／被封）就保留舊信和價，唔好靜靜地掉咗
     for k, v in old.items():
-        if v.get("s") == "信和" and k not in fees:
+        if v.get("s") in ("信和", "非官方") and k not in fees:
             fees[k] = v
 
-    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+yuexiu+sino",
+    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+yuexiu+sino+ref",
            "n": len(fees), "fees": fees}
     with open("data/park_fees.json", "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
