@@ -1220,7 +1220,13 @@ setInterval(loadRadar, 720000);
     </ul>
 
     <h3 class="wn-h">更新紀錄</h3>
-    <div class="wn-day"><span class="d">2026-11-27</span><span class="t">地圖搜尋 × 設施徽章 <span class="wn-tag">最新</span></span></div>
+    <div class="wn-day"><span class="d">2026-11-28</span><span class="t">信和商場時租 <span class="wn-tag">最新</span></span></div>
+    <ul class="wn-list">
+      <li><b>信和 6 個場加官網時租</b>：屯門市廣場一期 $19／假 $27、二期 $27（貨車 $30）、三期 $17／假 $22；荃新天地及荃新天地2 $18／假 $25；黃金海岸商場 $13／半小時（一至四）、$16／半小時（五六日及公假）、夜泊 $88。popup 收費行標「· 信和」。</li>
+      <li><b>每週一自動重抓官網</b>：直接讀三個商場官網時租表（屯門市廣場、荃新天地、黃金海岸）；官網改版抽唔到就保留舊價，唔會清空。</li>
+    </ul>
+
+    <div class="wn-day"><span class="d">2026-11-27</span><span class="t">地圖搜尋 × 設施徽章</span></div>
     <ul class="wn-list">
       <li><b>搜尋框變「任何地名」</b>：打大廈／商場／街道名（旺角中心、皇廷廣場、ifc…）即時用 OpenStreetMap 查座標，飛去目標並落一個藍針；車場即時空位、Cafe、咪錶、山徑照舊排先。</li>
       <li><b>地鐵出口改寫出口編號</b>（A1／B2／D1…，冇編號才顯示 M），popup 顯示所屬站名（旺角站、旺角東站、太子站…）。</li>
@@ -3089,7 +3095,7 @@ setInterval(loadRadar, 720000);
     for (i = 0; i < arr.length; i++){
       p = arr[i]; e = fee[p.id];
       if (!e) continue;
-      var off = (e.s === "越秀");   // 越秀官網價優先蓋過出行易文字
+      var off = (e.s === "越秀" || e.s === "信和");   // 官網價優先蓋過出行易文字
       if (e.t && (off || !p.f)){ p.f = e.t; p.fs = e.s || ""; n++; }
       if (e.h && (off || !p.fh)){ p.fh = e.h; n++; }
       if (!p.fw && e.w){ p.fw = e.w; n++; }

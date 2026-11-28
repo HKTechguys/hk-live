@@ -154,6 +154,140 @@ def apt_fees():
     return out
 
 
+SINO = {
+    "tm": "https://www.tmtp.com.hk/tc/Parking",          # 屯門市廣場 1/2/3 期
+    "cw": "https://www.citywalk.com.hk/tc/Parking",      # 荃新天地 / 荃新天地2
+    "gc": "https://www.goldcoastpiazza.com.hk/tc/parking/",  # 黃金海岸商場
+}
+# 出行易 PARK_ID -> 官網分期 key（id 穩定，優先；名稱只做 fallback）
+SINO_ID = {"tdc25p3": "tm1", "tdc25p43": "tm2", "tdc25p22": "tm3",
+           "tdc25p29": "cw", "tdc25p30": "cw", "tdc25p23": "gc"}
+
+
+def sino_mall(name):
+    n = name or ""
+    if "屯門市廣場" in n:
+        if "第一" in n or "1期" in n:
+            return "tm1"
+        if "第二" in n:
+            return "tm2"
+        if "第三" in n:
+            return "tm3"
+    if "荃新天地" in n:      # 1 期 / 2 期同價
+        return "cw"
+    if "黃金海岸商場" in n:
+        return "gc"
+    return ""
+
+
+def _cells(tr):
+    s = re.sub(r"<[^>]+>", "\x00", tr)
+    s = (s.replace("&amp;", "&").replace("&nbsp;", " ").replace("&lt;", "<")
+         .replace("&gt;", ">").replace("&#39;", "'").replace("&quot;", '"'))
+    s = s.replace("\xa0", " ").replace("\u3000", " ")
+    s = re.sub(r"[ \t\r\n]+", " ", s)
+    return [c.strip() for c in s.split("\x00") if c.strip()]
+
+
+def _rows(html):
+    out = []
+    for tb in re.findall(r"<table[^>]*>.*?</table>", html, re.S | re.I):
+        rs = [_cells(tr) for tr in re.findall(r"<tr[^>]*>.*?</tr>", tb, re.S | re.I)]
+        rs = [r for r in rs if r]
+        if rs:
+            out.append(rs)
+    return out
+
+
+def _num(s):
+    m = re.search(r"\$\s?(\d+)", s)
+    return int(m.group(1)) if m else 0
+
+
+def sino_fees():
+    """信和官網有明碼時租嘅場。抽唔到就回空 dict，由 main 保留舊價。"""
+    out = {}
+
+    h = get(SINO["tm"], "https://www.tmtp.com.hk/")
+    if h:
+        for rs in _rows(h):
+            txt = " ".join(" ".join(r) for r in rs)
+            if "期停車場" not in txt:
+                continue
+            if "浮動車位" in txt or "車架" in txt or "0800" in txt:   # 月租表／日泊表
+                continue
+            cur = ""
+            for r in rs:
+                if re.match(r"[123]\s*期停車場", r[0]):
+                    cur = r[0][0]
+                    continue
+                if not cur or r[0].startswith("貨車"):   # 私家車/輕型貨車 唔可以當貨車 skip
+                    continue
+                price = _num(r[-1])
+                if not price:
+                    continue
+                e = out.setdefault("tm" + cur, {"h": 0, "hh": 0, "d12": 0, "d24": 0})
+                j = " ".join(r)
+                if re.search(r"星期一至五|一至五|星期一至日", j):
+                    e["h"] = price
+                elif re.search(r"星期六|六、日|公眾假期", j):
+                    e["hh"] = price
+                elif "私家車" in j:
+                    e["h"] = e["hh"] = price
+            break                                                    # 只用第一個時租表
+
+    h = get(SINO["cw"], "https://www.citywalk.com.hk/")
+    if h:
+        for rs in _rows(h):
+            if "荃新天地2" not in " ".join(" ".join(r) for r in rs):
+                continue
+            e = out.setdefault("cw", {"h": 0, "hh": 0, "d12": 0, "d24": 0})
+            for r in rs:
+                price = _num(r[-1])
+                if not price:
+                    continue
+                j = " ".join(r)
+                if "星期一至五" in j:
+                    e["h"] = price
+                elif "星期六" in j:
+                    e["hh"] = price
+            break
+
+    h = get(SINO["gc"], "https://www.goldcoastpiazza.com.hk/")
+    if h:
+        for rs in _rows(h):
+            if "半小時" not in " ".join(" ".join(r) for r in rs):
+                continue
+            e = out.setdefault("gc", {"h": 0, "hh": 0, "d12": 0, "d24": 0})
+            night = 0
+            for r in rs:
+                j = " ".join(r)
+                price = _num(j)
+                if not price:
+                    continue
+                if "星期一至四" in j:
+                    e["h"] = price * 2
+                elif "星期五至日" in j:
+                    e["hh"] = price * 2
+                elif "夜泊" in j:
+                    night = price
+            e["t"] = ("時租 $%d／半小時（一至四）、$%d／半小時（五六日及公假）"
+                      % (e["h"] // 2, e["hh"] // 2) + ("；夜泊 $%d" % night if night else ""))
+            break
+
+    for k, e in out.items():
+        if not e.get("t"):
+            if e["h"] and e["hh"] and e["hh"] != e["h"]:
+                e["t"] = "時租 $%d／假 $%d 每小時" % (e["h"], e["hh"])
+            elif e["h"]:
+                e["t"] = "時租 $%d 每小時" % e["h"]
+        if k == "tm2":
+            e["t"] = "時租 $%d 每小時（私家車；貨車 $30）" % e["h"]
+        e["s"], e["u"] = "信和", time.strftime("%Y-%m-%d")
+    print("sino malls:", {k: v["t"] for k, v in out.items()})
+    return out
+
+
 def norm(s):
     s = (s or "").replace("（", "(").replace("）", ")").replace("　", " ")
     s = re.sub(r"\s+", "", s)
@@ -229,6 +363,12 @@ def yuexiu_fee(aid):
 
 
 def main():
+    old = {}
+    try:
+        with open("data/park_fees.json", encoding="utf-8") as fh:
+            old = (json.load(fh) or {}).get("fees") or {}
+    except Exception:
+        old = {}
     raw = get(HKEM, "https://www.hkemobility.gov.hk/tc/")
     if not raw:
         sys.exit("cannot fetch hkem layer")
@@ -328,7 +468,22 @@ def main():
             yx_hit += 1
     print("yuexiu mapped:", yx_hit)
 
-    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+yuexiu",
+    # 信和官網時租（屯門市廣場 1/2/3 期、荃新天地、黃金海岸）；官網冇明碼嘅場唔碰
+    sino = sino_fees()
+    sino_hit = 0
+    for k, v in sites.items():
+        mall = SINO_ID.get(k) or sino_mall(v["n"])
+        if not mall or mall not in sino:
+            continue
+        fees[k] = dict(sino[mall])
+        sino_hit += 1
+    print("sino mapped:", sino_hit)
+    # 官網今次抽唔到（改版／被封）就保留舊信和價，唔好靜靜地掉咗
+    for k, v in old.items():
+        if v.get("s") == "信和" and k not in fees:
+            fees[k] = v
+
+    out = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "src": "linkhk+mtr+yuexiu+sino",
            "n": len(fees), "fees": fees}
     with open("data/park_fees.json", "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
